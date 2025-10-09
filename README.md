@@ -53,3 +53,7 @@ http://localhost:3000/
 
 ## 🔍目录结构
 
+## 📄 License
+
+MIT © DeepWiki-Plus Contributors  
+“Standing on the shoulders of giants—and taking one more step.”
