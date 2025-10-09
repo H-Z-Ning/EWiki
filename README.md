@@ -24,6 +24,12 @@ git clone https://github.com/H-Z-Ning/EWiki.git
 将src/config.xml中的API_KEY改为自己阿里云的API_KEY
 
 **第三步 执行后端**
+
+创建项目时使用的是python3.11.7
+
+```shell
+pip install -r requirements.txt
+```
 ```shell
 python app.py
 ```
