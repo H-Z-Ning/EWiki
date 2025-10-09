@@ -112,9 +112,16 @@ def import_project(src_path: str) -> str:
         raise RuntimeError("路径不存在或非目录")
     name = src.name or "untitled"
     dst = REPOS_DIR / name
-    if dst.exists():                       # 重名就加随机串
-        name = f"{name}_{uuid.uuid4().hex[:6]}"
-        dst = REPOS_DIR / name
+
+    # 如果目录已存在，直接使用原名称（不再添加随机串）
+    if dst.exists():
+        log.info("project already exists, using existing directory: %s", name)
+        # >>> 新增：已有 wiki 则直接返回，不再 build
+        if (OUTPUT_BASE / name / "PROJECT.md").exists():
+            log.info("wiki already exists, skip build for %s", name)
+            return name
+        return name
+
     copytree(src, dst)
     log.info("copied %s -> %s", src, dst)
     return name
@@ -237,6 +244,7 @@ def build_wiki(project: str) -> None:
     project_modules[project]  = list(module_docs.keys())
     log.info("[build_wiki] <<< all finished – project=%s | modules=%s", project, len(module_docs))
 
+
 # ==============================================================================
 # FastAPI 初始化
 # ==============================================================================
@@ -271,6 +279,9 @@ def list_projects():
 async def import_and_build(req: ImportReq):
     try:
         name = import_project(req.path)
+        # >>> 新增：已有 wiki 直接返回
+        if (OUTPUT_BASE / name / "PROJECT.md").exists():
+            return {"project": name, "message": "wiki already exists"}
         build_wiki(name)
         return {"project": name}
     except Exception as e:
@@ -671,6 +682,174 @@ async def chat(project: str, req: ChatRequest):
     except Exception as e:
         log.exception(f"Chat failed for project {project}")
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+
+# 在 ImportReq 模型后添加
+import zipfile
+import tarfile
+import py7zr
+import os
+from pathlib import Path
+
+
+class FileUploadReq(BaseModel):
+    filename: str
+
+
+@app.post("/api/upload")
+async def upload_and_build(file: UploadFile = File(...)):
+    """上传压缩文件并生成 Wiki"""
+    try:
+        # 检查文件类型
+        allowed_extensions = {'.zip', '.rar', '.7z', '.tar', '.gz'}
+        file_extension = Path(file.filename).suffix.lower()
+
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"不支持的文件格式。支持格式: {', '.join(allowed_extensions)}"
+            )
+
+        # 使用文件名作为项目名（不添加时间戳和随机数）
+        project_name = Path(file.filename).stem
+
+        # 创建项目目录
+        project_dir = REPOS_DIR / project_name
+        project_dir.mkdir(parents=True, exist_ok=True)
+
+        # 如果项目已存在，直接使用现有目录
+        if any(project_dir.iterdir()):
+            log.info("project already exists, rebuilding wiki: %s", project_name)
+        else:
+            # 保存上传的文件
+            uploaded_file_path = project_dir / file.filename
+            with open(uploaded_file_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+
+            # 解压文件
+            extract_success = False
+            try:
+                if file_extension == '.zip':
+                    extract_success = extract_zip(uploaded_file_path, project_dir)
+                elif file_extension == '.rar':
+                    extract_success = extract_rar(uploaded_file_path, project_dir)
+                elif file_extension in ['.7z']:
+                    extract_success = extract_7z(uploaded_file_path, project_dir)
+                elif file_extension in ['.tar', '.gz']:
+                    extract_success = extract_tar(uploaded_file_path, project_dir)
+
+                if not extract_success:
+                    raise HTTPException(status_code=400, detail="文件解压失败")
+
+            except Exception as extract_error:
+                # 清理失败的文件
+                import shutil
+                shutil.rmtree(project_dir, ignore_errors=True)
+                raise HTTPException(status_code=400, detail=f"解压失败: {str(extract_error)}")
+
+            # 删除原始压缩文件
+            uploaded_file_path.unlink()
+        if (OUTPUT_BASE / project_name / "PROJECT.md").exists():
+            return {"project": project_name, "message": "wiki already exists"}
+        # 构建 Wiki（如果已存在会覆盖）
+        build_wiki(project_name)
+
+        return {"project": project_name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("file upload failed")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+import shutil
+from pathlib import Path
+
+
+@app.delete("/api/projects/{project_name}")
+async def delete_project(project_name: str):
+    """删除项目及其 Wiki"""
+    try:
+        # 安全检查：防止路径遍历攻击
+        if ".." in project_name or "/" in project_name:
+            raise HTTPException(status_code=400, detail="无效的项目名称")
+
+        project_dir = REPOS_DIR / project_name
+        project_out_dir = OUTPUT_BASE / project_name
+        # 检查项目是否存在
+        if not project_dir.exists():
+            raise HTTPException(status_code=404, detail="项目不存在")
+
+        # 删除项目目录
+        shutil.rmtree(project_dir)
+
+        shutil.rmtree(project_out_dir)
+
+        return {"message": f"项目 {project_name} 删除成功"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception(f"删除项目失败: {project_name}")
+        raise HTTPException(status_code=500, detail=f"删除项目失败: {str(e)}")
+
+def extract_zip(zip_path: Path, extract_to: Path) -> bool:
+    """解压 ZIP 文件"""
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_to)
+        return True
+    except Exception as e:
+        log.error(f"ZIP extraction failed: {e}")
+        return False
+
+
+def extract_rar(rar_path: Path, extract_to: Path) -> bool:
+    """解压 RAR 文件"""
+    try:
+        # 需要安装 rarfile: pip install rarfile
+        import rarfile
+        with rarfile.RarFile(rar_path) as rar_ref:
+            rar_ref.extractall(extract_to)
+        return True
+    except ImportError:
+        raise HTTPException(status_code=400, detail="RAR 解压支持未安装，请安装 rarfile")
+    except Exception as e:
+        log.error(f"RAR extraction failed: {e}")
+        return False
+
+
+def extract_7z(sevenz_path: Path, extract_to: Path) -> bool:
+    """解压 7z 文件"""
+    try:
+        # 需要安装 py7zr: pip install py7zr
+        with py7zr.SevenZipFile(sevenz_path, mode='r') as sevenz_ref:
+            sevenz_ref.extractall(extract_to)
+        return True
+    except ImportError:
+        raise HTTPException(status_code=400, detail="7z 解压支持未安装，请安装 py7zr")
+    except Exception as e:
+        log.error(f"7z extraction failed: {e}")
+        return False
+
+
+def extract_tar(tar_path: Path, extract_to: Path) -> bool:
+    """解压 tar/tar.gz 文件"""
+    try:
+        if tar_path.suffix == '.gz':
+            # tar.gz 文件
+            with tarfile.open(tar_path, 'r:gz') as tar_ref:
+                tar_ref.extractall(extract_to)
+        else:
+            # 普通 tar 文件
+            with tarfile.open(tar_path, 'r') as tar_ref:
+                tar_ref.extractall(extract_to)
+        return True
+    except Exception as e:
+        log.error(f"TAR extraction failed: {e}")
+        return False
+
 
 # ~~~~~~~~~~~~~~ 静态文件（可选） ~~~~~~~~~~~~~~
 app.mount("/static", StaticFiles(directory=str(OUTPUT_BASE), html=True), name="static")
