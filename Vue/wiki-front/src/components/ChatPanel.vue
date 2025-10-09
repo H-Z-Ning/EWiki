@@ -12,8 +12,13 @@
         <span class="no-project" v-else>未选择项目</span>
       </div>
       <div class="header-actions" v-if="currentProject">
-        <button class="knowledge-btn" @click="showKnowledgePanel = !showKnowledgePanel" title="知识库管理">
-          📚
+        <button
+          class="knowledge-btn"
+          @click="showKnowledgePanel = !showKnowledgePanel"
+          title="知识库管理"
+        >
+          <span class="knowledge-icon">📚</span>
+          <span class="knowledge-text">上传知识库</span>
         </button>
         <button class="close-btn" @click="closeDrawer">×</button>
       </div>
@@ -257,7 +262,7 @@ const scrollToBottom = async () => {
 // 知识库相关方法
 const loadKnowledgeFiles = async () => {
   if (!currentProject.value) return
-  
+
   try {
     const response = await fetch(`/api/${currentProject.value}/knowledge/files`)
     if (response.ok) {
@@ -277,17 +282,17 @@ const handleFileUpload = (event: Event) => {
 
 const confirmUpload = async () => {
   if (!uploadingFile.value || !currentProject.value) return
-  
+
   uploading.value = true
   const formData = new FormData()
   formData.append('file', uploadingFile.value)
-  
+
   try {
     const response = await fetch(`/api/${currentProject.value}/knowledge/upload`, {
       method: 'POST',
       body: formData
     })
-    
+
     if (response.ok) {
       const result = await response.json()
       console.log('文件上传成功:', result)
@@ -311,12 +316,12 @@ const confirmUpload = async () => {
 
 const deleteKnowledgeFile = async (filename: string) => {
   if (!currentProject.value || !confirm('确定要删除这个文件吗？')) return
-  
+
   try {
     const response = await fetch(`/api/${currentProject.value}/knowledge/files/${filename}`, {
       method: 'DELETE'
     })
-    
+
     if (response.ok) {
       await loadKnowledgeFiles()
     } else {
@@ -1116,20 +1121,30 @@ onMounted(() => {
 }
 
 .knowledge-btn {
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #eef4ff;
+  border: 1px solid #d0dfff;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #0969da;
+  cursor: pointer;
+  transition: all .2s ease;
 }
 
 .knowledge-btn:hover {
-  background: #f6f8fa;
+  background: #d0e2ff;
+  border-color: #a6c7ff;
+}
+
+.knowledge-icon {
+  font-size: 16px;
+}
+
+.knowledge-text {
+  font-weight: 500;
+  white-space: nowrap;
 }
 </style>
