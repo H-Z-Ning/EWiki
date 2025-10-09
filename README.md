@@ -11,6 +11,9 @@ EWiki 是一个自动化工具，用于从本地代码或上传的项目生成�
 - **集成 LLM 查询**：支持通过 LLM 模型回答开发者的技术问题。
 
 ## 🎯项目截图
+
+
+## 🛠️使用说明
 **第一步 clone 项目**
 ```shell
 git clone https://github.com/H-Z-Ning/EWiki.git
@@ -40,8 +43,6 @@ npm run dev
 ```shell
 http://localhost:3000/
 ```
-## 🛠️使用说明
-
 
 ## 🔍目录结构
 
