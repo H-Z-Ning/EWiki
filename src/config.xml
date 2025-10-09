@@ -1,13 +1,15 @@
 <?xml version='1.0' encoding='utf-8'?>
 <config>
     <API_KEY>sk-9440a2435538408290e2b89d6d3c4e54</API_KEY>
-    <EMBED_NAME>text-embedding-v4</EMBED_NAME>
+    <EMBED_NAME>text-embedding-v3</EMBED_NAME>
     <EMBED_URL>https://dashscope.aliyuncs.com/compatible-mode/v1</EMBED_URL>
     <LLM_NAME>qwen3-coder-plus-2025-09-23</LLM_NAME>
     <LLM_URL>https://dashscope.aliyuncs.com/compatible-mode/v1</LLM_URL>
     <INDEX_FILE>faiss.index</INDEX_FILE>
     <META_FILE>meta.json</META_FILE>
     <MAX_LINES>50</MAX_LINES>
-    <BATCH_SIZE>6</BATCH_SIZE>
+    <BATCH_SIZE>8</BATCH_SIZE>
     <TOP_K>5</TOP_K>
+    <MAX_CONCURRENT>5</MAX_CONCURRENT>
+    <EMBED_TIMEOUT>30</EMBED_TIMEOUT>
 </config>
