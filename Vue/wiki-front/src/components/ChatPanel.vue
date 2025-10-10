@@ -1,194 +1,229 @@
 <!-- ChatPanel.vue -->
 <template>
-  <aside
-    class="chat-drawer"
-    :style="{ transform: drawerTransform }"
-  >
-    <!-- 头部 -->
-    <header class="chat-header">
-      <div class="header-left">
-        <h3>💬 项目对话</h3>
-        <span class="project-badge" v-if="currentProject">{{ currentProject }}</span>
-        <span class="no-project" v-else>未选择项目</span>
-      </div>
-      <div class="header-actions" v-if="currentProject">
-        <button
-          class="knowledge-btn"
-          @click="showKnowledgePanel = !showKnowledgePanel"
-          title="知识库管理"
-        >
-          <span class="knowledge-icon">📚</span>
-          <span class="knowledge-text">上传知识库</span>
-        </button>
-        <button class="close-btn" @click="closeDrawer">×</button>
-      </div>
-      <div v-else class="header-actions">
-        <button class="close-btn" @click="closeDrawer">×</button>
-      </div>
-    </header>
-    <div v-if="showKnowledgePanel && currentProject" class="knowledge-panel">
-      <div class="knowledge-header">
-        <h4>📚 知识库管理</h4>
-        <button class="close-panel-btn" @click="showKnowledgePanel = false">×</button>
-      </div>
-
-      <!-- 文件上传 -->
-      <div class="upload-section">
-        <input
-          type="file"
-          ref="fileInput"
-          @change="handleFileUpload"
-          style="display: none"
-          accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx,.csv,.json,.xml,.html"
-        />
-        <button class="upload-btn" @click="$refs.fileInput.click()">
-          📁 选择文件
-        </button>
-        <span class="file-name" v-if="uploadingFile">{{ uploadingFile.name }}</span>
-        <button
-          class="confirm-upload-btn"
-          @click="confirmUpload"
-          :disabled="!uploadingFile"
-        >
-          {{ uploading ? '上传中...' : '上传' }}
-        </button>
-      </div>
-
-      <!-- 文件列表 -->
-      <div class="file-list" v-if="knowledgeFiles.length > 0">
-        <h5>已上传文件:</h5>
-        <div
-          v-for="file in knowledgeFiles"
-          :key="file.filename"
-          class="file-item"
-        >
-          <span class="file-info">
-            <strong>{{ file.filename }}</strong>
-            ({{ formatFileSize(file.size) }})
-          </span>
+  <!-- 底部聊天面板 -->
+  <div class="chat-panel" :class="{ 'panel-open': isOpen }">
+    <!-- 聊天弹窗 -->
+    <div class="chat-modal" v-if="isOpen">
+      <!-- 头部 -->
+      <header class="chat-header">
+        <div class="header-left">
+          <h3>💬 项目对话</h3>
+          <span class="project-badge" v-if="currentProject">{{ currentProject }}</span>
+          <span class="no-project" v-else>未选择项目</span>
+        </div>
+        <div class="header-actions" v-if="currentProject">
           <button
-            class="delete-file-btn"
-            @click="deleteKnowledgeFile(file.filename)"
-            title="删除文件"
+            class="knowledge-btn"
+            @click="showKnowledgePanel = !showKnowledgePanel"
+            title="知识库管理"
           >
-            🗑️
+            <span class="knowledge-icon">📚</span>
+            <span class="knowledge-text">知识库</span>
+          </button>
+          <button class="close-btn" @click="closePanel">×</button>
+        </div>
+        <div v-else class="header-actions">
+          <button class="close-btn" @click="closePanel">×</button>
+        </div>
+      </header>
+
+      <!-- 知识库面板 -->
+      <div v-if="showKnowledgePanel && currentProject" class="knowledge-panel">
+        <div class="knowledge-header">
+          <h4>📚 知识库管理</h4>
+          <button class="close-panel-btn" @click="showKnowledgePanel = false">×</button>
+        </div>
+
+        <!-- 文件上传 -->
+        <div class="upload-section">
+          <input
+            type="file"
+            ref="fileInput"
+            @change="handleFileUpload"
+            style="display: none"
+            accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx,.csv,.json,.xml,.html"
+          />
+          <button class="upload-btn" @click="$refs.fileInput.click()">
+            📁 选择文件
+          </button>
+          <span class="file-name" v-if="uploadingFile">{{ uploadingFile.name }}</span>
+          <button
+            class="confirm-upload-btn"
+            @click="confirmUpload"
+            :disabled="!uploadingFile"
+          >
+            {{ uploading ? '上传中...' : '上传' }}
           </button>
         </div>
-      </div>
-      <div v-else class="no-files">
-        <p>暂无知识库文件</p>
-      </div>
 
-      <div class="knowledge-tips">
-        <small>支持格式: txt, md, pdf, doc, xls, json, xml, html 等</small>
-      </div>
-    </div>
-    <!-- 消息列表 -->
-    <div class="chat-messages" ref="msgBox">
-      <!-- 欢迎消息 -->
-      <div v-if="messages.length === 0" class="welcome-message">
-        <div class="welcome-content">
-          <div class="welcome-icon">🤖</div>
-          <h4>欢迎使用 EWiki 助手</h4>
-          <p>我可以帮您：</p>
-          <ul>
-            <li>解释代码功能和实现</li>
-            <li>分析项目结构和模块关系</li>
-            <li>回答关于代码逻辑的问题</li>
-            <li>提供开发建议和最佳实践</li>
-          </ul>
-          <p v-if="currentProject">当前项目: <strong>{{ currentProject }}</strong></p>
-          <p v-else class="warning-text">请先在左侧选择项目</p>
+        <!-- 文件列表 -->
+        <div class="file-list" v-if="knowledgeFiles.length > 0">
+          <h5>已上传文件:</h5>
+          <div
+            v-for="file in knowledgeFiles"
+            :key="file.filename"
+            class="file-item"
+          >
+            <span class="file-info">
+              <strong>{{ file.filename }}</strong>
+              ({{ formatFileSize(file.size) }})
+            </span>
+            <button
+              class="delete-file-btn"
+              @click="deleteKnowledgeFile(file.filename)"
+              title="删除文件"
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+        <div v-else class="no-files">
+          <p>暂无知识库文件</p>
+        </div>
+
+        <div class="knowledge-tips">
+          <small>支持格式: txt, md, pdf, doc, xls, json, xml, html 等</small>
         </div>
       </div>
 
-      <!-- 对话消息 -->
-      <div
-        v-for="(m, i) in messages"
-        :key="i"
-        :class="['bubble', m.role]"
-      >
-        <div class="avatar">
-          {{ m.role === 'user' ? '🧑' : '🤖' }}
+      <!-- 消息列表 -->
+      <div class="chat-messages" ref="msgBox">
+        <!-- 欢迎消息 -->
+        <div v-if="messages.length === 0" class="welcome-message">
+          <div class="welcome-content">
+            <div class="welcome-icon">🤖</div>
+            <h4>欢迎使用 EWiki 助手</h4>
+            <p>我可以帮您：</p>
+            <ul>
+              <li>解释代码功能和实现</li>
+              <li>分析项目结构和模块关系</li>
+              <li>回答关于代码逻辑的问题</li>
+              <li>提供开发建议和最佳实践</li>
+            </ul>
+            <p v-if="currentProject">当前项目: <strong>{{ currentProject }}</strong></p>
+            <p v-else class="warning-text">请先在左侧选择项目</p>
+          </div>
         </div>
-        <div class="content">
-          <span class="name">{{ m.role === 'user' ? '您' : 'EWiki助手' }}</span>
-          <div class="text" v-html="render(m.text)"></div>
-          <span class="time">{{ formatTime(m.timestamp) }}</span>
-        </div>
-      </div>
 
-      <!-- 加载状态 -->
-      <div v-if="loading" class="bubble assistant loading-bubble">
-        <div class="avatar">🤖</div>
-        <div class="content">
-          <span class="name">EWiki助手</span>
-          <div class="text">
-            <div class="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
+        <!-- 对话消息 -->
+        <div
+          v-for="(m, i) in messages"
+          :key="i"
+          :class="['bubble', m.role]"
+        >
+          <div class="avatar">
+            {{ m.role === 'user' ? '⛄' : '🚀' }}
+          </div>
+          <div class="content">
+            <span class="name">{{ m.role === 'user' ? '' : 'EWiki助手' }}</span>
+            <div class="text" v-html="render(m.text)"></div>
+            <span class="time">{{ formatTime(m.timestamp) }}</span>
+          </div>
+        </div>
+
+        <!-- 加载状态 -->
+        <div v-if="loading" class="bubble assistant loading-bubble">
+          <div class="avatar">🤖</div>
+          <div class="content">
+            <span class="name">EWiki助手</span>
+            <div class="text">
+              <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
             </div>
+          </div>
+        </div>
+
+        <!-- 项目未选择提示 -->
+        <div v-if="!currentProject && messages.length > 0" class="project-warning">
+          <div class="warning-content">
+            <span>⚠️ 请先在左侧选择项目以获取准确的代码分析</span>
           </div>
         </div>
       </div>
 
-      <!-- 项目未选择提示 -->
-      <div v-if="!currentProject && messages.length > 0" class="project-warning">
-        <div class="warning-content">
-          <span>⚠️ 请先在左侧选择项目以获取准确的代码分析</span>
+      <!-- 知识库状态 -->
+      <div class="knowledge-status" v-if="currentProject && lastResponseHasKnowledge">
+        <span class="knowledge-badge">📚 已结合知识库内容</span>
+      </div>
+
+      <!-- 底部输入 -->
+      <div class="chat-footer">
+        <div class="project-info" v-if="currentProject">
+          <span class="project-label">当前项目:</span>
+          <span class="project-name">{{ currentProject }}</span>
+        </div>
+        <div class="project-info" v-else>
+          <span class="no-project-label">请在左侧选择项目</span>
+        </div>
+
+        <form @submit.prevent="send" class="chat-input">
+          <input
+            v-model="input"
+            :disabled="loading || !currentProject"
+            :placeholder="inputPlaceholder"
+            maxlength="1000"
+          />
+          <button
+            :disabled="loading || !currentProject || !input.trim()"
+            type="submit"
+            class="send-btn"
+          >
+            <span v-if="loading">⏳</span>
+            <span v-else>➤</span>
+          </button>
+        </form>
+
+        <div class="chat-tips" v-if="!currentProject">
+          <small>请在左侧边栏选择项目以开始对话</small>
+        </div>
+        <div class="chat-tips" v-else>
+          <small>按 Enter 发送，Ctrl+Enter 换行</small>
         </div>
       </div>
     </div>
-    <div class="knowledge-status" v-if="currentProject && lastResponseHasKnowledge">
-      <span class="knowledge-badge">📚 已结合知识库内容</span>
+
+ <div class="chat-trigger" @click="togglePanel" :class="{ 'trigger-active': isOpen }">
+      <div class="trigger-container">
+        <div class="trigger-main">
+          <!-- 左侧图标和状态 -->
+          <div class="trigger-left">
+            <div class="trigger-icon-wrapper">
+              <span class="trigger-icon">💬</span>
+              <div class="online-indicator" v-if="currentProject"></div>
+            </div>
+            <div class="trigger-info">
+              <span class="trigger-title">AI 助手</span>
+              <span class="trigger-status" :class="{ 'status-online': currentProject, 'status-offline': !currentProject }">
+                {{ currentProject ? '在线 · ' + currentProject : '请选择项目' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 右侧状态和箭头 -->
+          <div class="trigger-right">
+            <div class="message-indicator" v-if="messages.length > 0">
+              <span class="message-count">{{ messages.length }}</span>
+              <span class="message-text">条对话</span>
+            </div>
+            <div class="trigger-arrow" :class="{ 'arrow-up': isOpen }">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 进度条效果 -->
+        <div class="trigger-progress" :class="{ 'progress-active': isOpen }"></div>
+      </div>
     </div>
-    <!-- 底部输入 -->
-    <div class="chat-footer">
-      <div class="project-info" v-if="currentProject">
-        <span class="project-label">当前项目:</span>
-        <span class="project-name">{{ currentProject }}</span>
-      </div>
-      <div class="project-info" v-else>
-        <span class="no-project-label">请在左侧选择项目</span>
-      </div>
 
-      <form @submit.prevent="send" class="chat-input">
-        <input
-          v-model="input"
-          :disabled="loading || !currentProject"
-          :placeholder="inputPlaceholder"
-          maxlength="1000"
-        />
-        <button
-          :disabled="loading || !currentProject || !input.trim()"
-          type="submit"
-          class="send-btn"
-        >
-          <span v-if="loading">⏳</span>
-          <span v-else>➤</span>
-        </button>
-      </form>
-
-      <div class="chat-tips" v-if="!currentProject">
-        <small>请在左侧边栏选择项目以开始对话</small>
-      </div>
-      <div class="chat-tips" v-else>
-        <small>按 Enter 发送，Ctrl+Enter 换行</small>
-      </div>
-    </div>
-  </aside>
-
-  <!-- 触发按钮 -->
-  <button
-    v-if="!isOpen"
-    class="fab"
-    @click="openDrawer"
-    :title="fabTitle"
-  >
-    💬
-    <span class="fab-badge" v-if="messages.length > 0">{{ messages.length }}</span>
-  </button>
+    <!-- 遮罩层 -->
+    <div v-if="isOpen" class="chat-overlay" @click="closePanel"></div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -206,7 +241,7 @@ const md = new MarkdownIt({
   typographer: true
 })
 
-// 响应式数据 - 确保按正确顺序初始化
+// 响应式数据
 const messages = ref<{
   role: 'user' | 'assistant';
   text: string;
@@ -230,16 +265,10 @@ const uploading = ref(false)
 const lastResponseHasKnowledge = ref(false)
 
 // 其他计算属性
-const drawerTransform = computed(() => (isOpen.value ? 'translateX(0)' : 'translateX(100%)'))
 const inputPlaceholder = computed(() => {
   if (!currentProject.value) return '请在左侧选择项目...'
   if (loading.value) return '正在思考中...'
   return '输入关于代码的问题，按回车发送'
-})
-const fabTitle = computed(() => {
-  const count = messages.value.length
-  const projectInfo = currentProject.value ? ` - ${currentProject.value}` : ''
-  return count > 0 ? `对话记录 (${count} 条${projectInfo})` : '打开对话窗口'
 })
 
 // 方法
@@ -424,19 +453,19 @@ const send = async () => {
   }
 }
 
-// 其他原有方法保持不变...
-const openDrawer = () => {
-  isOpen.value = true
-  // 打开时如果有项目，添加欢迎消息并加载知识库
-  if (currentProject.value) {
+// 面板控制方法
+const togglePanel = () => {
+  isOpen.value = !isOpen.value
+  if (isOpen.value && currentProject.value) {
     if (messages.value.length === 0) {
       addWelcomeMessage()
     }
     loadKnowledgeFiles()
+    setTimeout(() => scrollToBottom(), 100)
   }
 }
 
-const closeDrawer = () => {
+const closePanel = () => {
   isOpen.value = false
 }
 
@@ -450,17 +479,11 @@ const addWelcomeMessage = () => {
   }
 }
 
-// 监听器和生命周期保持不变...
-watch(isOpen, (newVal) => {
-  if (newVal) {
-    setTimeout(() => scrollToBottom(), 100)
-  }
-})
-
+// 监听器和生命周期
 watch(currentProject, (newProject, oldProject) => {
   if (newProject && newProject !== oldProject) {
     messages.value = []
-    loadKnowledgeFiles() // 新增：加载知识库文件
+    loadKnowledgeFiles()
     addWelcomeMessage()
     if (isOpen.value) {
       setTimeout(() => scrollToBottom(), 100)
@@ -468,14 +491,14 @@ watch(currentProject, (newProject, oldProject) => {
   }
 })
 
-// 键盘快捷键和生命周期保持不变...
+// 键盘快捷键和生命周期
 const handleKeydown = (event: KeyboardEvent) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault()
     send()
   } else if (event.key === 'Escape' && isOpen.value) {
     event.preventDefault()
-    closeDrawer()
+    closePanel()
   }
 }
 
@@ -483,36 +506,155 @@ onMounted(() => {
   document.addEventListener('keydown', handleKeydown)
   if (currentProject.value) {
     addWelcomeMessage()
-    loadKnowledgeFiles() // 新增：加载知识库文件
+    loadKnowledgeFiles()
   }
 })
 </script>
 
 <style scoped>
-.chat-drawer {
+/* 底部触发条 */
+.chat-trigger {
   position: fixed;
-  top: 0;
+  bottom: 0;
+  left: 0;
   right: 0;
-  width: 33vw;
-  min-width: 400px;
-  max-width: 600px;
-  height: 100vh;
-  background: #f6f8fa;
-  border-left: 1px solid #d0d7de;
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.3s ease;
-  z-index: 9999;
-  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 1000;
+  box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.15);
 }
 
+.chat-trigger:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.2);
+}
+
+.trigger-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trigger-icon {
+  font-size: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.trigger-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.trigger-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.trigger-subtitle {
+  font-size: 12px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.trigger-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.message-count {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+.trigger-arrow {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.arrow-up {
+  transform: rotate(180deg);
+}
+
+/* 聊天弹窗 */
+.chat-modal {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 800px;
+  height: 70vh;
+  max-height: 600px;
+  background: white;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  z-index: 1002;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateX(-50%) translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 遮罩层 */
+.chat-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1001;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 头部样式调整 */
 .chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  background: #fff;
-  border-bottom: 1px solid #d0d7de;
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #e1e5e9;
   flex-shrink: 0;
 }
 
@@ -566,14 +708,114 @@ onMounted(() => {
   color: #24292f;
 }
 
+/* 消息区域调整 */
 .chat-messages {
   flex: 1;
-  padding: 16px;
+  padding: 16px 20px;
   overflow-y: auto;
   scroll-behavior: smooth;
 }
 
-/* 欢迎消息 */
+/* 底部输入区域调整 */
+.chat-footer {
+  border-top: 1px solid #e1e5e9;
+  background: white;
+  flex-shrink: 0;
+}
+
+.project-info {
+  padding: 12px 20px;
+  border-bottom: 1px solid #f6f8fa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-label {
+  font-size: 13px;
+  color: #656d76;
+}
+
+.project-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0969da;
+  background: #f6f8fa;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.no-project-label {
+  font-size: 13px;
+  color: #656d76;
+  font-style: italic;
+}
+
+.chat-input {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #d0d7de;
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.chat-input input:focus {
+  border-color: #0969da;
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+}
+
+.chat-input input:disabled {
+  background: #f6f8fa;
+  color: #656d76;
+  cursor: not-allowed;
+}
+
+.send-btn {
+  background: #0969da;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #0550ae;
+  transform: scale(1.05);
+}
+
+.send-btn:disabled {
+  background: #d0d7de;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.chat-tips {
+  padding: 8px 20px 16px;
+  text-align: center;
+}
+
+.chat-tips small {
+  color: #656d76;
+  font-size: 12px;
+}
+
+/* 保留原有的消息气泡样式 */
 .welcome-message {
   display: flex;
   justify-content: center;
@@ -623,7 +865,6 @@ onMounted(() => {
   font-size: 13px;
 }
 
-/* 消息气泡 */
 .bubble {
   display: flex;
   margin-bottom: 16px;
@@ -727,7 +968,6 @@ onMounted(() => {
   text-align: right;
 }
 
-/* 加载状态 */
 .loading-bubble .text {
   display: flex;
   align-items: center;
@@ -756,7 +996,6 @@ onMounted(() => {
   40% { opacity: 1; }
 }
 
-/* 项目警告 */
 .project-warning {
   display: flex;
   justify-content: center;
@@ -772,201 +1011,14 @@ onMounted(() => {
   color: #7d4e00;
 }
 
-/* 底部区域 */
-.chat-footer {
-  border-top: 1px solid #d0d7de;
-  background: white;
-  flex-shrink: 0;
-}
-
-.project-info {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f6f8fa;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.project-label {
-  font-size: 13px;
-  color: #656d76;
-}
-
-.project-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #0969da;
-  background: #f6f8fa;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.no-project-label {
-  font-size: 13px;
-  color: #656d76;
-  font-style: italic;
-}
-
-.chat-input {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  gap: 8px;
-}
-
-.chat-input input {
-  flex: 1;
-  padding: 12px 16px;
-  border: 1px solid #d0d7de;
-  border-radius: 20px;
-  font-size: 14px;
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.chat-input input:focus {
-  border-color: #0969da;
-  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
-}
-
-.chat-input input:disabled {
-  background: #f6f8fa;
-  color: #656d76;
-  cursor: not-allowed;
-}
-
-.send-btn {
-  background: #0969da;
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.send-btn:hover:not(:disabled) {
-  background: #0550ae;
-  transform: scale(1.05);
-}
-
-.send-btn:disabled {
-  background: #d0d7de;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.chat-tips {
-  padding: 8px 16px 16px;
-  text-align: center;
-}
-
-.chat-tips small {
-  color: #656d76;
-  font-size: 12px;
-}
-
-/* 触发按钮 */
-.fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  border: none;
-  background: #0969da;
-  color: #fff;
-  font-size: 24px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(9, 105, 218, 0.3);
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1001;
-}
-
-.fab:hover {
-  background: #0550ae;
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(9, 105, 218, 0.4);
-}
-
-.fab-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: #cf222e;
-  color: white;
-  border-radius: 10px;
-  min-width: 18px;
-  height: 18px;
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid white;
-}
-
-/* 动画 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .chat-drawer {
-    width: 100vw;
-    min-width: unset;
-    max-width: unset;
-  }
-
-  .content {
-    max-width: 85%;
-  }
-}
-
-/* 滚动条样式 */
-.chat-messages::-webkit-scrollbar {
-  width: 6px;
-}
-
-.chat-messages::-webkit-scrollbar-track {
-  background: #f6f8fa;
-}
-
-.chat-messages::-webkit-scrollbar-thumb {
-  background: #d0d7de;
-  border-radius: 3px;
-}
-
-.chat-messages::-webkit-scrollbar-thumb:hover {
-  background: #afb8c1;
-}
-
-
-/* 知识库面板样式 */
+/* 知识库相关样式保持不变 */
 .knowledge-panel {
   background: white;
   border: 1px solid #d0d7de;
   border-radius: 8px;
   margin: 16px;
   padding: 0;
-  max-height: 400px;
+  max-height: 300px;
   overflow-y: auto;
 }
 
@@ -1100,7 +1152,6 @@ onMounted(() => {
   font-size: 11px;
 }
 
-/* 知识库状态提示 */
 .knowledge-status {
   padding: 8px 16px;
   background: #f0f9ff;
@@ -1113,7 +1164,6 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* 头部操作按钮 */
 .header-actions {
   display: flex;
   align-items: center;
@@ -1144,7 +1194,745 @@ onMounted(() => {
 }
 
 .knowledge-text {
-  font-weight: 500;
+  font-weight: 610;
   white-space: nowrap;
 }
+
+/* 滚动条样式 */
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: #f6f8fa;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: #d0d7de;
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #afb8c1;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .chat-modal {
+    width: 95%;
+    height: 80vh;
+    max-height: none;
+    bottom: 70px;
+  }
+
+  .trigger-content {
+    padding: 0 10px;
+  }
+
+  .trigger-title {
+    font-size: 14px;
+  }
+
+  .trigger-subtitle {
+    font-size: 11px;
+  }
+
+  .content {
+    max-width: 85%;
+  }
+}
+
+/* 重新设计的底部触发条 */
+.chat-trigger {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 400px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 1000;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.chat-trigger:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.chat-trigger.trigger-active {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(9, 105, 218, 0.2);
+  box-shadow:
+    0 8px 32px rgba(9, 105, 218, 0.15),
+    0 2px 8px rgba(9, 105, 218, 0.1);
+}
+
+.trigger-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.trigger-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* 左侧内容 */
+.trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.trigger-icon-wrapper {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.trigger-icon {
+  font-size: 18px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.online-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.trigger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trigger-title {
+  font-weight: 700;
+  font-size: 16px;
+  color: #1f2937;
+  letter-spacing: -0.01em;
+}
+
+.trigger-status {
+  font-size: 13px;
+  font-weight: 610;
+  transition: color 0.3s ease;
+}
+
+.status-online {
+  color: #10b981;
+}
+
+.status-offline {
+  color: #6b7280;
+}
+
+/* 右侧内容 */
+.trigger-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.message-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(9, 105, 218, 0.08);
+  padding: 6px 10px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.message-count {
+  font-weight: 700;
+  font-size: 13px;
+  color: #0969da;
+  min-width: 16px;
+  text-align: center;
+}
+
+.message-text {
+  font-size: 12px;
+  color: #0969da;
+  font-weight: 610;
+  white-space: nowrap;
+}
+
+.trigger-arrow {
+  color: #6b7280;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(107, 114, 128, 0.05);
+}
+
+.trigger-arrow:hover {
+  background: rgba(107, 114, 128, 0.1);
+  color: #374151;
+}
+
+.trigger-arrow.arrow-up {
+  transform: rotate(180deg);
+  color: #0969da;
+  background: rgba(9, 105, 218, 0.1);
+}
+
+/* 进度条效果 */
+.trigger-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 0 0 16px 16px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 1;
+}
+
+.trigger-progress.progress-active {
+  transform: scaleX(1);
+}
+
+/* 弹窗和遮罩层样式保持不变 */
+.chat-modal {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 800px;
+  height: 70vh;
+  max-height: 600px;
+  background: white;
+  border-radius: 20px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  display: flex;
+  flex-direction: column;
+  z-index: 1002;
+  overflow: hidden;
+  animation: modalSlideUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateX(-50%) translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+.chat-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1001;
+  animation: overlayFadeIn 0.3s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .chat-trigger {
+    bottom: 16px;
+    width: calc(100% - 32px);
+    max-width: none;
+  }
+
+  .trigger-main {
+    padding: 14px 16px;
+  }
+
+  .trigger-icon-wrapper {
+    width: 36px;
+    height: 36px;
+  }
+
+  .trigger-icon {
+    font-size: 16px;
+  }
+
+  .trigger-title {
+    font-size: 15px;
+  }
+
+  .trigger-status {
+    font-size: 12px;
+  }
+
+  .message-indicator {
+    padding: 5px 8px;
+  }
+
+  .message-count, .message-text {
+    font-size: 11px;
+  }
+
+  .chat-modal {
+    bottom: 90px;
+    width: calc(100% - 32px);
+    height: 75vh;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .trigger-right {
+    gap: 8px;
+  }
+
+  .message-text {
+    display: none;
+  }
+
+  .message-indicator {
+    padding: 6px 8px;
+    border-radius: 50%;
+    min-width: 32px;
+    justify-content: center;
+  }
+}
+
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+  .chat-trigger {
+    background: rgba(31, 41, 55, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-trigger:hover {
+    background: rgba(31, 41, 55, 0.98);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.4),
+      0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .trigger-title {
+    color: #f9fafb;
+  }
+
+  .trigger-status {
+    color: #d1d5db;
+  }
+
+  .status-online {
+    color: #34d399;
+  }
+
+  .status-offline {
+    color: #9ca3af;
+  }
+
+  .trigger-arrow {
+    color: #9ca3af;
+    background: rgba(156, 163, 175, 0.1);
+  }
+
+  .trigger-arrow:hover {
+    background: rgba(156, 163, 175, 0.2);
+    color: #e5e7eb;
+  }
+}
+
+/* 重新设计的底部触发条 - 加长版本 */
+.chat-trigger {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px; /* 增加最大宽度 */
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 1000;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.chat-trigger:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.chat-trigger.trigger-active {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(9, 105, 218, 0.2);
+  box-shadow:
+    0 8px 32px rgba(9, 105, 218, 0.15),
+    0 2px 8px rgba(9, 105, 218, 0.1);
+}
+
+.trigger-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.trigger-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px; /* 增加内边距让条更长 */
+  position: relative;
+  z-index: 2;
+}
+
+/* 左侧内容 - 扩展布局 */
+.trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 16px; /* 增加间距 */
+  flex: 1;
+}
+
+.trigger-icon-wrapper {
+  position: relative;
+  width: 44px; /* 稍大一些的图标 */
+  height: 44px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  flex-shrink: 0;
+}
+
+.trigger-icon {
+  font-size: 20px; /* 更大的图标 */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.online-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.trigger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* 增加间距 */
+  min-width: 0;
+  flex: 1;
+}
+
+.trigger-title {
+  font-weight: 700;
+  font-size: 17px; /* 稍大的字体 */
+  color: #1f2937;
+  letter-spacing: -0.01em;
+}
+
+.trigger-status {
+  font-size: 14px; /* 稍大的状态文字 */
+  font-weight: 610;
+  transition: color 0.3s ease;
+}
+
+.status-online {
+  color: #10b981;
+}
+
+.status-offline {
+  color: #6b7280;
+}
+
+/* 右侧内容 - 扩展布局 */
+.trigger-right {
+  display: flex;
+  align-items: center;
+  gap: 16px; /* 增加间距 */
+  flex-shrink: 0;
+}
+
+.message-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 增加间距 */
+  background: rgba(9, 105, 218, 0.08);
+  padding: 8px 12px; /* 更大的内边距 */
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  min-width: 80px; /* 确保有足够宽度 */
+  justify-content: center;
+}
+
+.message-count {
+  font-weight: 700;
+  font-size: 14px; /* 稍大的字体 */
+  color: #0969da;
+  min-width: 18px;
+  text-align: center;
+}
+
+.message-text {
+  font-size: 13px; /* 稍大的字体 */
+  color: #0969da;
+  font-weight: 610;
+  white-space: nowrap;
+}
+
+.trigger-arrow {
+  color: #6b7280;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; /* 更大的箭头区域 */
+  height: 36px;
+  border-radius: 10px; /* 更大的圆角 */
+  background: rgba(107, 114, 128, 0.05);
+  flex-shrink: 0;
+}
+
+.trigger-arrow:hover {
+  background: rgba(107, 114, 128, 0.1);
+  color: #374151;
+}
+
+.trigger-arrow.arrow-up {
+  transform: rotate(180deg);
+  color: #0969da;
+  background: rgba(9, 105, 218, 0.1);
+}
+
+/* 进度条效果 */
+.trigger-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px; /* 更粗的进度条 */
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 0 0 16px 16px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 1;
+}
+
+.trigger-progress.progress-active {
+  transform: scaleX(1);
+}
+
+/* 弹窗位置调整以适应更长的触发条 */
+.chat-modal {
+  position: fixed;
+  bottom: 110px; /* 调整位置避免重叠 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 900px;
+  height: 85vh;
+  max-height: 1000px;
+  background: white;
+  border-radius: 20px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  display: flex;
+  flex-direction: column;
+  z-index: 1002;
+  overflow: hidden;
+  animation: modalSlideUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .chat-trigger {
+    bottom: 16px;
+    width: calc(100% - 32px);
+    max-width: none;
+  }
+
+  .trigger-main {
+    padding: 16px 20px; /* 移动端保持合适的内边距 */
+  }
+
+  .trigger-icon-wrapper {
+    width: 40px;
+    height: 40px;
+  }
+
+  .trigger-icon {
+    font-size: 18px;
+  }
+
+  .trigger-title {
+    font-size: 16px;
+  }
+
+  .trigger-status {
+    font-size: 13px;
+  }
+
+  .message-indicator {
+    padding: 7px 10px;
+    min-width: 70px;
+  }
+
+  .message-count, .message-text {
+    font-size: 12px;
+  }
+
+  .chat-modal {
+    bottom: 100px; /* 移动端调整位置 */
+    width: calc(100% - 32px);
+    height: 75vh;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .trigger-main {
+    padding: 14px 16px;
+  }
+
+  .trigger-left {
+    gap: 12px;
+  }
+
+  .trigger-icon-wrapper {
+    width: 36px;
+    height: 36px;
+  }
+
+  .trigger-right {
+    gap: 12px;
+  }
+
+  .message-text {
+    display: block; /* 小屏幕也显示文字 */
+  }
+
+  .message-indicator {
+    min-width: auto;
+    padding: 6px 10px;
+  }
+}
+
+/* 超宽屏幕支持 */
+@media (min-width: 1200px) {
+  .chat-trigger {
+    max-width: 550px; /* 在宽屏上更宽 */
+  }
+}
+
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+  .chat-trigger {
+    background: rgba(31, 41, 55, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-trigger:hover {
+    background: rgba(31, 41, 55, 0.98);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.4),
+      0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .trigger-title {
+    color: #f9fafb;
+  }
+
+  .trigger-status {
+    color: #d1d5db;
+  }
+
+  .status-online {
+    color: #34d399;
+  }
+
+  .status-offline {
+    color: #9ca3af;
+  }
+
+  .trigger-arrow {
+    color: #9ca3af;
+    background: rgba(156, 163, 175, 0.1);
+  }
+
+  .trigger-arrow:hover {
+    background: rgba(156, 163, 175, 0.2);
+    color: #e5e7eb;
+  }
+}
+
+
 </style>
