@@ -24,12 +24,20 @@ def head_text(path: Path, max_lines: int, max_bytes: int) -> str:
     txt = path.read_text(encoding='utf-8', errors='ignore')[:max_bytes]
     return '\n'.join(txt.splitlines()[:max_lines])
 
-def plan_wiki_structure(repo: str,file_tree: str, readme: str, repo_root: Path,source_code_stone: Path,java_callgraph_stone: Path) -> str:
-    codes = query_code(query=file_tree+readme, project_root=str(repo_root), out_path=str(source_code_stone))
-    java_callgraph=get_java_callgraph(file_tree+readme,str(repo_root),str(java_callgraph_stone))
+
+def plan_wiki_structure(repo: str, file_tree: str, readme: str, repo_root: Path, source_code_stone: Path,
+                        java_callgraph_stone: Path, language: str = "zh") -> str:
+    codes = query_code(query=file_tree + readme, project_root=str(repo_root), out_path=str(source_code_stone))
+    java_callgraph = get_java_callgraph(file_tree + readme, str(repo_root), str(java_callgraph_stone))
     codes = codes + java_callgraph
-    """Step-1：让 LLM 决定 wiki 结构"""
-    prompt = PLAN_WIKI_PROMPT.format(repo=repo,file_tree=file_tree, readme=readme,code_contents=codes)
+
+    # 根据语言选择提示词
+    if language == "en":
+        from .prompts import PLAN_WIKI_PROMPT_EN as PROMPT
+    else:
+        from .prompts import PLAN_WIKI_PROMPT as PROMPT
+
+    prompt = PROMPT.format(repo=repo, file_tree=file_tree, readme=readme, code_contents=codes)
     log.info("[plan_wiki_structure] prompt=\n%.10000s...", prompt)
     return generate(prompt, temperature=0.1, max_tokens=20480)
 
@@ -48,11 +56,9 @@ def write_page_from_dir(title: str,
                         file_dir: str,
                         repo_root: Path,
                         source_code_stone: Path,
-                        java_callgraph_stone: Path) -> str:
-    """
-    从 file_dir 中自动收集所有文档，按 head_text 限制后拼接生成 Wiki 页
-    """
-    # 1. 语义代码块（与 write_page 完全一致）
+                        java_callgraph_stone: Path,
+                        language: str = "zh") -> str:
+    # 1. 语义代码块
     codes = query_code(query=description, project_root=str(repo_root), out_path=str(source_code_stone))
     codes += get_java_callgraph(description, str(repo_root), str(java_callgraph_stone))
 
@@ -70,9 +76,16 @@ def write_page_from_dir(title: str,
         total += len(seg.encode('utf-8'))
 
     file_contents = "\n\n".join(chunks)
-    prompt = WRITE_PAGE_PROMPT.format(title=title,
-                                      file_contents=file_contents,
-                                      code_contents=codes)
+
+    # 根据语言选择提示词
+    if language == "en":
+        from .prompts import WRITE_PAGE_PROMPT_EN as PROMPT
+    else:
+        from .prompts import WRITE_PAGE_PROMPT as PROMPT
+
+    prompt = PROMPT.format(title=title,
+                           file_contents=file_contents,
+                           code_contents=codes)
     log.info("[write_page_from_dir] prompt=%.10000s...", prompt)
     return generate(prompt, temperature=0.1, max_tokens=20480)
 
@@ -81,8 +94,8 @@ def write_page(title: str,
                file_paths: List[str],
                repo_root: Path,
                source_code_stone: Path,
-               java_callgraph_stone: Path) -> str:
-
+               java_callgraph_stone: Path,
+               language: str = "zh") -> str:
     # ---- 1. 语义代码块 ----
     codes = query_code(query=description, project_root=str(repo_root), out_path=str(source_code_stone))
     codes += get_java_callgraph(description, str(repo_root), str(java_callgraph_stone))
@@ -94,19 +107,25 @@ def write_page(title: str,
         if not full.exists():
             continue
         content = head_text(full, MAX_HEAD_LINES, MAX_FILE_BYTES)
-        seg = f"{fp}\n{'-'*40}\n{content}"
+        seg = f"{fp}\n{'-' * 40}\n{content}"
         if total + len(seg.encode('utf-8')) > MAX_TOTAL_BYTES:
-            seg = f"{fp}\n{'-'*40}\n... (truncated)"
+            seg = f"{fp}\n{'-' * 40}\n... (truncated)"
         chunks.append(seg)
         total += len(seg.encode('utf-8'))
 
     file_contents = "\n\n".join(chunks)
-    prompt = WRITE_PAGE_PROMPT.format(title=title,
-                                      file_contents=file_contents,
-                                      code_contents=codes)
+
+    # 根据语言选择提示词
+    if language == "en":
+        from .prompts import WRITE_PAGE_PROMPT_EN as PROMPT
+    else:
+        from .prompts import WRITE_PAGE_PROMPT as PROMPT
+
+    prompt = PROMPT.format(title=title,
+                           file_contents=file_contents,
+                           code_contents=codes)
     log.info("[write_page] prompt=%.10000s...", prompt)
     return generate(prompt, temperature=0.1, max_tokens=20480)
-
 def get_java_callgraph(query:str,repo_root: str,out: str):
     from tools.project_parser import save_java_callgraph,get_java_callgraph_from_faiss_store
     save_java_callgraph(repo_root,out)
