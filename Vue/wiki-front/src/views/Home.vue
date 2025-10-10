@@ -31,6 +31,45 @@
         </button>
       </div>
 
+      <!-- Wiki 语言选择 - 优化版本 -->
+      <div class="language-selection">
+        <div class="language-header">
+          <span class="language-icon">🌐</span>
+          <span class="language-title">{{ $t('home.wikiLanguage') }}</span>
+          <span class="language-hint">{{ $t('home.languageHint') }}</span>
+        </div>
+        <div class="language-options">
+          <div
+            class="lang-card"
+            :class="{ active: wikiLanguage === 'zh' }"
+            @click="wikiLanguage = 'zh'"
+          >
+            <div class="lang-flag">🇨🇳</div>
+            <div class="lang-info">
+              <div class="lang-name">{{ $t('home.chinese') }}</div>
+              <div class="lang-desc">{{ $t('home.zhdoclang') }}</div>
+            </div>
+            <div class="lang-check">
+              <div class="check-icon" v-if="wikiLanguage === 'zh'">✓</div>
+            </div>
+          </div>
+          <div
+            class="lang-card"
+            :class="{ active: wikiLanguage === 'en' }"
+            @click="wikiLanguage = 'en'"
+          >
+            <div class="lang-flag">🇺🇸</div>
+            <div class="lang-info">
+              <div class="lang-name">{{ $t('home.english') }}</div>
+              <div class="lang-desc">{{ $t('home.endoclang') }}</div>
+            </div>
+            <div class="lang-check">
+              <div class="check-icon" v-if="wikiLanguage === 'en'">✓</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 本地路径输入 -->
       <div v-if="activeTab === 'local'" class="input-box">
         <input
@@ -158,8 +197,9 @@ const projects = ref<Project[]>([])
 const activeTab = ref('local')
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const wikiLanguage = ref('zh') // 新增：Wiki语言选择
 
-// 删除相关状态
+// 删除相关状态保持不变
 const showDeleteConfirm = ref(false)
 const projectToDelete = ref('')
 const deleting = ref(false)
@@ -181,7 +221,10 @@ const doImport = async () => {
   if (!path.value.trim()) return
   running.value = true
   try {
-    const { data } = await axios.post('/api/import', { path: path.value.trim() })
+    const { data } = await axios.post('/api/import', {
+      path: path.value.trim(),
+      language: wikiLanguage.value // 新增这一行
+    })
     await loadList()
     router.push(`/wiki/${data.project}`)
   } catch (error) {
@@ -259,6 +302,7 @@ const doUpload = async () => {
   try {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
+    formData.append('language', wikiLanguage.value) // 新增这一行
 
     const { data } = await axios.post('/api/upload', formData, {
       headers: {
@@ -885,5 +929,182 @@ onMounted(() => {
 
 .title {
   margin: 0;
+}
+
+/* ==================== 优化的语言选择样式 ==================== */
+.language-selection {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.language-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.language-icon {
+  font-size: 20px;
+  opacity: 0.9;
+}
+
+.language-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #fff;
+}
+
+.language-hint {
+  font-size: 12px;
+  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.8);
+  margin-left: auto;
+}
+
+.language-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.lang-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.lang-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.lang-card:hover::before {
+  left: 100%;
+}
+
+.lang-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.lang-card.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+  border-color: #6366f1;
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+}
+
+.lang-flag {
+  font-size: 24px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.lang-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.lang-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.lang-desc {
+  font-size: 12px;
+  opacity: 0.8;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.lang-check {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.check-icon {
+  width: 16px;
+  height: 16px;
+  background: #10b981;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  animation: checkPop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .language-options {
+    grid-template-columns: 1fr;
+  }
+
+  .language-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .language-hint {
+    margin-left: 0;
+    font-size: 11px;
+  }
+
+  .lang-card {
+    padding: 14px;
+  }
+}
+
+@media (min-width: 768px) {
+  .language-options {
+    gap: 16px;
+  }
+
+  .lang-card {
+    padding: 18px;
+  }
 }
 </style>
