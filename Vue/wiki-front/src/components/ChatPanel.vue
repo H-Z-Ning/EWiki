@@ -5,105 +5,104 @@
     <!-- 聊天弹窗 -->
     <div class="chat-modal" v-if="isOpen">
       <!-- 头部 -->
-      <header class="chat-header">
-        <div class="header-left">
-          <h3>💬 项目对话</h3>
-          <span class="project-badge" v-if="currentProject">{{ currentProject }}</span>
-          <span class="no-project" v-else>未选择项目</span>
-        </div>
-        <div class="header-actions" v-if="currentProject">
-          <button
-            class="knowledge-btn"
-            @click="showKnowledgePanel = !showKnowledgePanel"
-            title="知识库管理"
-          >
-            <span class="knowledge-icon">📚</span>
-            <span class="knowledge-text">上传知识库</span>
-          </button>
-          <button class="close-btn" @click="closePanel">×</button>
-        </div>
-        <div v-else class="header-actions">
-          <button class="close-btn" @click="closePanel">×</button>
-        </div>
-      </header>
+  <header class="chat-header">
+    <div class="header-left">
+      <h3>{{ $t('chat.projectChat') }}</h3>
+      <span class="project-badge" v-if="currentProject">{{ currentProject }}</span>
+      <span class="no-project" v-else>{{ $t('chat.noProjectSelected') }}</span>
+    </div>
+    <div class="header-actions" v-if="currentProject">
+      <button
+        class="knowledge-btn"
+        @click="showKnowledgePanel = !showKnowledgePanel"
+        :title="$t('chat.knowledgeManagement')"
+      >
+        <span class="knowledge-text">{{ $t('chat.uploadKnowledge') }}</span>
+      </button>
+      <button class="close-btn" @click="closePanel">{{ $t('common.close') }}</button>
+    </div>
+    <div v-else class="header-actions">
+      <button class="close-btn" @click="closePanel">{{ $t('common.close') }}</button>
+    </div>
+  </header>
 
-      <!-- 知识库面板 -->
-      <div v-if="showKnowledgePanel && currentProject" class="knowledge-panel">
-        <div class="knowledge-header">
-          <h4>📚 知识库管理</h4>
-          <button class="close-panel-btn" @click="showKnowledgePanel = false">×</button>
-        </div>
+  <!-- 知识库面板 -->
+  <div v-if="showKnowledgePanel && currentProject" class="knowledge-panel">
+    <div class="knowledge-header">
+      <h4>{{ $t('chat.knowledgeManagement') }}</h4>
+      <button class="close-panel-btn" @click="showKnowledgePanel = false">{{ $t('common.close') }}</button>
+    </div>
 
-        <!-- 文件上传 -->
-        <div class="upload-section">
-          <input
-            type="file"
-            ref="fileInput"
-            @change="handleFileUpload"
-            style="display: none"
-            accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx,.csv,.json,.xml,.html"
-          />
-          <button class="upload-btn" @click="$refs.fileInput.click()">
-            📁 选择文件
-          </button>
-          <span class="file-name" v-if="uploadingFile">{{ uploadingFile.name }}</span>
-          <button
-            class="confirm-upload-btn"
-            @click="confirmUpload"
-            :disabled="!uploadingFile"
-          >
-            {{ uploading ? '上传中...' : '上传' }}
-          </button>
-        </div>
+    <!-- 文件上传 -->
+    <div class="upload-section">
+      <input
+        type="file"
+        ref="fileInput"
+        @change="handleFileUpload"
+        style="display: none"
+        accept=".txt,.md,.pdf,.doc,.docx,.xls,.xlsx,.csv,.json,.xml,.html"
+      />
+      <button class="upload-btn" @click="$refs.fileInput.click()">
+        {{ $t('chat.selectFile') }}
+      </button>
+      <span class="file-name" v-if="uploadingFile">{{ uploadingFile.name }}</span>
+      <button
+        class="confirm-upload-btn"
+        @click="confirmUpload"
+        :disabled="!uploadingFile"
+      >
+        {{ uploading ? $t('common.uploading') : $t('common.upload') }}
+      </button>
+    </div>
 
-        <!-- 文件列表 -->
-        <div class="file-list" v-if="knowledgeFiles.length > 0">
-          <h5>已上传文件:</h5>
-          <div
-            v-for="file in knowledgeFiles"
-            :key="file.filename"
-            class="file-item"
-          >
-            <span class="file-info">
-              <strong>{{ file.filename }}</strong>
-              ({{ formatFileSize(file.size) }})
-            </span>
-            <button
-              class="delete-file-btn"
-              @click="deleteKnowledgeFile(file.filename)"
-              title="删除文件"
-            >
-              🗑️
-            </button>
-          </div>
-        </div>
-        <div v-else class="no-files">
-          <p>暂无知识库文件</p>
-        </div>
-
-        <div class="knowledge-tips">
-          <small>支持格式: txt, md, pdf, doc, xls, json, xml, html 等</small>
-        </div>
+    <!-- 文件列表 -->
+    <div class="file-list" v-if="knowledgeFiles.length > 0">
+      <h5>{{ $t('chat.uploadedFiles') }}</h5>
+      <div
+        v-for="file in knowledgeFiles"
+        :key="file.filename"
+        class="file-item"
+      >
+        <span class="file-info">
+          <strong>{{ file.filename }}</strong>
+          ({{ formatFileSize(file.size) }})
+        </span>
+        <button
+          class="delete-file-btn"
+          @click="deleteKnowledgeFile(file.filename)"
+          :title="$t('common.delete')"
+        >
+          🗑️
+        </button>
       </div>
+    </div>
+    <div v-else class="no-files">
+      <p>{{ $t('chat.noFiles') }}</p>
+    </div>
+
+    <div class="knowledge-tips">
+      <small>{{ $t('chat.supportedFormats') }}</small>
+    </div>
+  </div>
 
       <!-- 消息列表 -->
       <div class="chat-messages" ref="msgBox">
         <!-- 欢迎消息 -->
-        <div v-if="messages.length === 0" class="welcome-message">
-          <div class="welcome-content">
-            <div class="welcome-icon">🚀</div>
-            <h4>欢迎使用 EWiki 助手</h4>
-            <p>我可以帮您：</p>
-            <ul>
-              <li>解释代码功能和实现</li>
-              <li>分析项目结构和模块关系</li>
-              <li>回答关于代码逻辑的问题</li>
-              <li>提供开发建议和最佳实践</li>
-            </ul>
-            <p v-if="currentProject">当前项目: <strong>{{ currentProject }}</strong></p>
-            <p v-else class="warning-text">请先在左侧选择项目</p>
+          <div v-if="messages.length === 0" class="welcome-message">
+            <div class="welcome-content">
+              <div class="welcome-icon">🚀</div>
+              <h4>{{ $t('chat.welcome') }}</h4>
+              <p>{{ $t('chat.welcomeCapabilities') }}</p>
+              <ul>
+                <li>{{ $t('chat.explainCode') }}</li>
+                <li>{{ $t('chat.analyzeStructure') }}</li>
+                <li>{{ $t('chat.answerQuestions') }}</li>
+                <li>{{ $t('chat.provideAdvice') }}</li>
+              </ul>
+              <p v-if="currentProject">{{ $t('chat.currentProject') }} <strong>{{ currentProject }}</strong></p>
+              <p v-else class="warning-text">{{ $t('chat.selectProjectLeft') }}</p>
+            </div>
           </div>
-        </div>
 
         <!-- 对话消息 -->
         <div
@@ -125,7 +124,7 @@
         <div v-if="loading" class="bubble assistant loading-bubble">
           <div class="avatar">🚀</div>
           <div class="content">
-            <span class="name">EWiki助手</span>
+           <span class="name">{{ $t('chat.assistant') }}</span>
             <div class="text">
               <div class="typing-indicator">
                 <span></span>
@@ -146,18 +145,18 @@
 
       <!-- 知识库状态 -->
       <div class="knowledge-status" v-if="currentProject && lastResponseHasKnowledge">
-        <span class="knowledge-badge">📚 已结合知识库内容</span>
+        <span class="knowledge-badge">{{ $t('chat.knowledgeApplied') }}</span>
       </div>
 
       <!-- 底部输入 -->
       <div class="chat-footer">
-        <div class="project-info" v-if="currentProject">
-          <span class="project-label">当前项目:</span>
-          <span class="project-name">{{ currentProject }}</span>
-        </div>
-        <div class="project-info" v-else>
-          <span class="no-project-label">请在左侧选择项目</span>
-        </div>
+      <div class="project-info" v-if="currentProject">
+        <span class="project-label">{{ $t('chat.currentProject') }}</span>
+        <span class="project-name">{{ currentProject }}</span>
+      </div>
+      <div class="project-info" v-else>
+        <span class="no-project-label">{{ $t('chat.selectProjectToStart') }}</span>
+      </div>
 
         <form @submit.prevent="send" class="chat-input">
           <input
@@ -176,12 +175,12 @@
           </button>
         </form>
 
-        <div class="chat-tips" v-if="!currentProject">
-          <small>请在左侧边栏选择项目以开始对话</small>
-        </div>
-        <div class="chat-tips" v-else>
-          <small>按 Enter 发送，Ctrl+Enter 换行</small>
-        </div>
+          <div class="chat-tips" v-if="!currentProject">
+            <small>{{ $t('chat.selectProjectToStart') }}</small>
+          </div>
+          <div class="chat-tips" v-else>
+            <small>{{ $t('chat.pressEnter') }}</small>
+          </div>
       </div>
     </div>
 
@@ -194,20 +193,20 @@
               <span class="trigger-icon">💬</span>
               <div class="online-indicator" v-if="currentProject"></div>
             </div>
-            <div class="trigger-info">
-              <span class="trigger-title">AI 助手</span>
-              <span class="trigger-status" :class="{ 'status-online': currentProject, 'status-offline': !currentProject }">
-                {{ currentProject ? '在线 · ' + currentProject : '请选择项目' }}
-              </span>
-            </div>
+              <div class="trigger-info">
+                <span class="trigger-title">{{ $t('chat.aiAssistant') }}</span>
+                <span class="trigger-status" :class="{ 'status-online': currentProject, 'status-offline': !currentProject }">
+                  {{ currentProject ? $t('chat.onlineWithProject', { project: currentProject }) : $t('chat.offline') }}
+                </span>
+              </div>
           </div>
 
           <!-- 右侧状态和箭头 -->
           <div class="trigger-right">
             <div class="message-indicator" v-if="messages.length > 0">
-              <span class="message-count">{{ messages.length }}</span>
-              <span class="message-text">条对话</span>
-            </div>
+                <span class="message-count">{{ messages.length }}</span>
+                <span class="message-text">{{ $t('chat.messages') }}</span>
+              </div>
             <div class="trigger-arrow" :class="{ 'arrow-up': isOpen }">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -229,10 +228,21 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import MarkdownIt from 'markdown-it'
 
-// 使用路由获取当前项目
+const { t } = useI18n()
 const route = useRoute()
+
+// 在计算属性中使用国际化
+const inputPlaceholder = computed(() => {
+  if (!currentProject.value) return t('chat.selectProjectFirst')
+  if (loading.value) return t('chat.thinking')
+  return t('chat.inputPlaceholder')
+})
+
+// 使用路由获取当前项目
+
 
 // Markdown 渲染器
 const md = new MarkdownIt({
@@ -265,11 +275,11 @@ const uploading = ref(false)
 const lastResponseHasKnowledge = ref(false)
 
 // 其他计算属性
-const inputPlaceholder = computed(() => {
-  if (!currentProject.value) return '请在左侧选择项目...'
-  if (loading.value) return '正在思考中...'
-  return '输入关于代码的问题，按回车发送'
-})
+// const inputPlaceholder = computed(() => {
+//   if (!currentProject.value) return '请在左侧选择项目...'
+//   if (loading.value) return '正在思考中...'
+//   return '输入关于代码的问题，按回车发送'
+// })
 
 // 方法
 const render = (txt: string) => md.render(txt)
@@ -430,15 +440,14 @@ const send = async () => {
 
   } catch (error) {
     console.error('Chat error:', error)
-    // 原有的错误处理逻辑保持不变
-    let errorMessage = '抱歉，暂时无法回答问题。'
+    let errorMessage = t('errors.requestFailed')
     if (error instanceof Error) {
       if (error.message.includes('404')) {
-        errorMessage = '项目未找到，请确保项目已正确导入。'
+        errorMessage = t('errors.projectNotFound')
       } else if (error.message.includes('500')) {
-        errorMessage = '服务器暂时不可用，请稍后重试。'
+        errorMessage = t('errors.serverError')
       } else {
-        errorMessage = `请求失败: ${error.message}`
+        errorMessage = `${t('errors.requestFailed')}: ${error.message}`
       }
     }
 
@@ -471,9 +480,11 @@ const closePanel = () => {
 
 const addWelcomeMessage = () => {
   if (currentProject.value && messages.value.length === 0) {
+    const welcomeText = `${t('chat.welcome')}! ${t('chat.welcomeCapabilities')}:\n\n• ${t('chat.welcomeStructure')}\n• ${t('chat.welcomeImplementation')}\n• ${t('chat.welcomeLogic')}\n• ${t('chat.welcomeArchitecture')}\n\n${t('chat.askFirstQuestion')}`
+
     messages.value.push({
       role: 'assistant',
-      text: `您好！我已准备好分析项目 **${currentProject.value}** 的代码。\n\n您可以问我：\n- 这个项目的整体结构和功能\n- 特定模块或类的实现细节\n- 代码逻辑和业务流程\n- 技术架构和设计模式\n\n请提出您的第一个问题吧！`,
+      text: welcomeText.replace('{project}', currentProject.value),
       timestamp: Date.now()
     })
   }
