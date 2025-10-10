@@ -2,13 +2,16 @@
   <div class="home">
     <!-- 顶部 Hero -->
     <section class="hero">
-      <h1 class="title">EWiki</h1>
-      <p class="subtitle">一键生成项目 Wiki，让文档不再难写</p>
+      <div class="hero-header">
+        <h1 class="title">{{ $t('home.title') }}</h1>
+        <LanguageSwitcher />
+      </div>
+      <p class="subtitle">{{ $t('home.subtitle') }}</p>
     </section>
 
     <!-- 导入区域 -->
     <section class="glass import-card">
-      <h3>📦 导入新项目</h3>
+      <h3>{{ $t('home.importProject') }}</h3>
 
       <!-- 选项卡 -->
       <div class="tab-buttons">
@@ -17,14 +20,14 @@
           :class="{ active: activeTab === 'local' }"
           @click="activeTab = 'local'"
         >
-          本地路径
+          {{ $t('home.localPath') }}
         </button>
         <button
           class="tab-button"
           :class="{ active: activeTab === 'upload' }"
           @click="activeTab = 'upload'"
         >
-          文件上传
+          {{ $t('home.fileUpload') }}
         </button>
       </div>
 
@@ -32,12 +35,12 @@
       <div v-if="activeTab === 'local'" class="input-box">
         <input
           v-model="path"
-          placeholder="粘贴本地项目绝对路径，如 /home/me/myproj"
+          :placeholder="$t('home.pathPlaceholder')"
           @keyup.enter="doImport"
         />
         <button class="primary" @click="doImport" :disabled="running">
-          <span v-if="!running">生成 Wiki</span>
-          <span v-else>生成中...</span>
+          <span v-if="!running">{{ $t('home.generateWiki') }}</span>
+          <span v-else>{{ $t('common.generating') }}</span>
         </button>
       </div>
 
@@ -53,8 +56,8 @@
           />
           <div class="upload-content">
             <span class="upload-icon">📦</span>
-            <p class="upload-text">点击选择 ZIP 文件或拖拽文件到这里</p>
-            <p class="upload-hint">支持 ZIP、RAR、7z 压缩包格式</p>
+            <p class="upload-text">{{ $t('home.dragDrop') }}</p>
+            <p class="upload-hint">{{ $t('home.supportedFormats') }}</p>
           </div>
         </div>
 
@@ -72,8 +75,8 @@
           @click="doUpload"
           :disabled="running || !selectedFile"
         >
-          <span v-if="!running">上传并生成 Wiki</span>
-          <span v-else>生成中...</span>
+          <span v-if="!running">{{ $t('home.uploadGenerate') }}</span>
+          <span v-else>{{ $t('common.generating') }}</span>
         </button>
       </div>
     </section>
@@ -81,13 +84,13 @@
     <!-- 已有项目 -->
     <section class="glass projects-card">
       <div class="projects-header">
-        <h3>📚 已有 Wiki 的项目</h3>
+        <h3>{{ $t('home.existingProjects') }}</h3>
         <div class="projects-count" v-if="projects.length > 0">
-          {{ projects.length }} 个项目
+          {{ projects.length }} {{ $t('common.projects') }}
         </div>
       </div>
       <div v-if="projects.length === 0" class="empty">
-        暂无项目，快去导入一个吧 ~
+        {{ $t('home.noProjects') }}
       </div>
       <div class="cards">
         <div
@@ -103,7 +106,7 @@
               <button
                 class="delete-btn"
                 @click.stop="confirmDelete(project.name)"
-                title="删除项目"
+                :title="$t('common.delete')"
               >
                 🗑️
               </button>
@@ -117,16 +120,16 @@
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDelete">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>确认删除</h3>
+          <h3>{{ $t('home.deleteConfirm') }}</h3>
         </div>
         <div class="modal-body">
-          <p>确定要删除项目 <strong>"{{ projectToDelete }}"</strong> 吗？</p>
-          <p class="warning-text">此操作将永久删除项目及其所有 Wiki 文档，且无法恢复！</p>
+          <p>{{ $t('home.deleteProjectConfirm') }} <strong>"{{ projectToDelete }}"</strong>？</p>
+          <p class="warning-text">{{ $t('home.deleteWarning') }}</p>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" @click="cancelDelete">取消</button>
+          <button class="btn-secondary" @click="cancelDelete">{{ $t('common.cancel') }}</button>
           <button class="btn-danger" @click="doDelete" :disabled="deleting">
-            {{ deleting ? '删除中...' : '确认删除' }}
+            {{ deleting ? $t('common.deleting') : $t('home.confirmDelete') }}
           </button>
         </div>
       </div>
@@ -137,7 +140,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
+import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
+
+const { t } = useI18n()
 
 interface Project {
   name: string;
@@ -148,7 +155,7 @@ const router = useRouter()
 const path = ref('')
 const running = ref(false)
 const projects = ref<Project[]>([])
-const activeTab = ref('local') // 'local' 或 'upload'
+const activeTab = ref('local')
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -161,12 +168,11 @@ const deleting = ref(false)
 const loadList = async () => {
   try {
     const response = await axios.get('/api/projects')
-    // 确保返回的是对象数组
     projects.value = Array.isArray(response.data)
       ? response.data.map((name: string) => ({ name }))
       : response.data
   } catch (error) {
-    console.error('加载项目列表失败:', error)
+    console.error(t('errors.loadFailed'), error)
     projects.value = []
   }
 }
@@ -176,11 +182,11 @@ const doImport = async () => {
   running.value = true
   try {
     const { data } = await axios.post('/api/import', { path: path.value.trim() })
-    await loadList() // 重新加载项目列表
+    await loadList()
     router.push(`/wiki/${data.project}`)
   } catch (error) {
-    console.error('导入项目失败:', error)
-    alert('导入失败，请检查路径是否正确')
+    console.error(t('errors.importFailed'), error)
+    alert(t('errors.importFailed'))
   } finally {
     running.value = false
   }
@@ -194,11 +200,10 @@ const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
     const file = target.files[0]
-    // 检查文件类型
     if (isValidArchiveFile(file)) {
       selectedFile.value = file
     } else {
-      alert('请上传 ZIP、RAR 或 7z 格式的压缩文件')
+      alert(t('errors.fileTypeError'))
       clearFile()
     }
   }
@@ -211,7 +216,7 @@ const handleDrop = (event: DragEvent) => {
     if (isValidArchiveFile(file)) {
       selectedFile.value = file
     } else {
-      alert('请上传 ZIP、RAR 或 7z 格式的压缩文件')
+      alert(t('errors.fileTypeError'))
       clearFile()
     }
   }
@@ -261,11 +266,11 @@ const doUpload = async () => {
       }
     })
 
-    await loadList() // 重新加载项目列表
+    await loadList()
     router.push(`/wiki/${data.project}`)
   } catch (error: any) {
-    console.error('上传文件失败:', error)
-    alert(`上传失败: ${error.response?.data?.detail || '请重试'}`)
+    console.error(t('errors.uploadFailed'), error)
+    alert(`${t('errors.uploadFailed')}: ${error.response?.data?.detail || t('errors.requestFailed')}`)
   } finally {
     running.value = false
   }
@@ -291,11 +296,11 @@ const doDelete = async () => {
   deleting.value = true
   try {
     await axios.delete(`/api/projects/${projectToDelete.value}`)
-    await loadList() // 重新加载项目列表
+    await loadList()
     cancelDelete()
   } catch (error: any) {
-    console.error('删除项目失败:', error)
-    alert(`删除失败: ${error.response?.data?.detail || '请重试'}`)
+    console.error(t('errors.deleteFailed'), error)
+    alert(`${t('errors.deleteFailed')}: ${error.response?.data?.detail || t('errors.requestFailed')}`)
     cancelDelete()
   }
 }
@@ -869,5 +874,16 @@ onMounted(() => {
 
 .primary:disabled span {
   animation: pulse 1.5s ease-in-out infinite;
+}
+.hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.title {
+  margin: 0;
 }
 </style>
