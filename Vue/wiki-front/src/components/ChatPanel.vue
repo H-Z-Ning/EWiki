@@ -18,7 +18,7 @@
             title="知识库管理"
           >
             <span class="knowledge-icon">📚</span>
-            <span class="knowledge-text">知识库</span>
+            <span class="knowledge-text">上传知识库</span>
           </button>
           <button class="close-btn" @click="closePanel">×</button>
         </div>
@@ -91,7 +91,7 @@
         <!-- 欢迎消息 -->
         <div v-if="messages.length === 0" class="welcome-message">
           <div class="welcome-content">
-            <div class="welcome-icon">🤖</div>
+            <div class="welcome-icon">🚀</div>
             <h4>欢迎使用 EWiki 助手</h4>
             <p>我可以帮您：</p>
             <ul>
@@ -123,7 +123,7 @@
 
         <!-- 加载状态 -->
         <div v-if="loading" class="bubble assistant loading-bubble">
-          <div class="avatar">🤖</div>
+          <div class="avatar">🚀</div>
           <div class="content">
             <span class="name">EWiki助手</span>
             <div class="text">
