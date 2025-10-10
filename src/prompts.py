@@ -33,7 +33,6 @@ When designing the wiki structure, include pages that would benefit from visual 
 
  `
 Create a structured wiki with the following main sections:
-- Overview (general information about the project)
 - System Architecture (how the system is designed)
 - Core Features (key functionality)
 - Data Management/Flow: If applicable, how data is stored, processed, accessed, and managed (e.g., database schema, data pipelines, state management).
@@ -112,7 +111,7 @@ Your task is to generate a comprehensive and accurate technical wiki page in Mar
            - -x for failed messages
          - Include activation boxes using +/- notation
          - Add notes for clarification using "Note over" or "Note right of"
-        【Supplementary Enforcement Notice】  
+         【Supplementary Enforcement Notice】  
             These rules override all previous instructions. Any violation is considered a format error.
             (1). Do **not** use “/” or “\” anywhere. Replace them with spaces or line breaks inside node text.  
                 Wrong: A[HTTP/Request]  
@@ -130,7 +129,7 @@ Your task is to generate a comprehensive and accurate technical wiki page in Mar
                - Node label > 4 words → reject
             (7). Return only two parts:  
                - Brief explanation (no code)  
-               - Clean ```mermaid … ``` block with **zero comments, zero blank lines, zero "Sources"**.
+               - Clean ```mermaid … ``` block with **zero comments, zero blank lines, zero “Sources”**.
 
 4.  **Tables:**
     *   Use Markdown tables to summarize information such as:
