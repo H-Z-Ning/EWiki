@@ -42,7 +42,12 @@
     "deleteConfirm": "Confirm Delete",
     "deleteProjectConfirm": "Are you sure you want to delete project",
     "deleteWarning": "This action will permanently delete the project and all its Wiki documentation, and cannot be recovered!",
-    "confirmDelete": "Confirm Delete"
+    "confirmDelete": "Confirm Delete",
+    "wikiLanguage": "Wiki Language",
+    "chinese": "Chinese",
+    "english": "English",
+    "endoclang": "English Documentation",
+    "zhdoclang": "Chinese Documentation"
   },
   "sidebar": {
     "repoOverview": "📚 Repository Overview",
