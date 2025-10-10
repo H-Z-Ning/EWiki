@@ -42,7 +42,12 @@
     "deleteConfirm": "确认删除",
     "deleteProjectConfirm": "确定要删除项目",
     "deleteWarning": "此操作将永久删除项目及其所有 Wiki 文档，且无法恢复！",
-    "confirmDelete": "确认删除"
+    "confirmDelete": "确认删除",
+    "wikiLanguage": "Wiki 文档语言",
+    "chinese": "中文",
+    "english": "英文",
+    "endoclang": "英文文档",
+    "zhdoclang": "中文文档"
   },
   "sidebar": {
     "repoOverview": "📚 仓库概览",
