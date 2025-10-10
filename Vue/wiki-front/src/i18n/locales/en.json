@@ -47,7 +47,8 @@
     "chinese": "Chinese",
     "english": "English",
     "endoclang": "English Documentation",
-    "zhdoclang": "Chinese Documentation"
+    "zhdoclang": "Chinese Documentation",
+    "languageHint": "Select the language for generated Wiki documentation"
   },
   "sidebar": {
     "repoOverview": "📚 Repository Overview",
