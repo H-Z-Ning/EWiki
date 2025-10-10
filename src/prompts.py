@@ -112,6 +112,25 @@ Your task is to generate a comprehensive and accurate technical wiki page in Mar
            - -x for failed messages
          - Include activation boxes using +/- notation
          - Add notes for clarification using "Note over" or "Note right of"
+        【Supplementary Enforcement Notice】  
+            These rules override all previous instructions. Any violation is considered a format error.
+            (1). Do **not** use “/” or “\” anywhere. Replace them with spaces or line breaks inside node text.  
+                Wrong: A[HTTP/Request]  
+                Correct: A[HTTP Request]
+            (2). Never write “Sources: …” inside the diagram. Put source information in plain text **outside** the code block.
+            (3). Never use “graph LR” or “flowchart LR”. Always use **“graph TD”** or **“flowchart TD”**.
+            (4). Node labels must be ≤ 4 Chinese characters or 4 English words. Use tool-tips or sub-graphs if longer.
+            (5). Sequence diagrams must start with **“sequenceDiagram”** on its own line.  
+               Participant names must not contain “/” or “\”.  
+               Arrows allowed only: `->>`, `-->>`, `-x`.
+            (6). Self-check with the following regex before output; **rewrite if any match**:  
+               - Contains “/” or “\” → reject  
+               - Contains “Sources:” → reject  
+               - Contains “LR” → reject  
+               - Node label > 4 words → reject
+            (7). Return only two parts:  
+               - Brief explanation (no code)  
+               - Clean ```mermaid … ``` block with **zero comments, zero blank lines, zero "Sources"**.
 
 4.  **Tables:**
     *   Use Markdown tables to summarize information such as:
