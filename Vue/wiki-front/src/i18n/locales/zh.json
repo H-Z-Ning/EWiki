@@ -47,7 +47,8 @@
     "chinese": "中文",
     "english": "英文",
     "endoclang": "英文文档",
-    "zhdoclang": "中文文档"
+    "zhdoclang": "中文文档",
+    "languageHint": "选择生成Wiki文档的语言"
   },
   "sidebar": {
     "repoOverview": "📚 仓库概览",
