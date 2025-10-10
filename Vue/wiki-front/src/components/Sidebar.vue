@@ -2,18 +2,18 @@
   <aside class="sidebar">
     <!-- 仓库概览 -->
     <section class="group">
-      <h4 class="title">📚 仓库概览</h4>
+      <h4 class="title">{{ $t('sidebar.repoOverview') }}</h4>
       <button
         :class="['btn', { active: current === 'project' }]"
         @click="select('project')"
       >
-        📖 项目总览
+        {{ $t('sidebar.projectOverview') }}
       </button>
     </section>
 
     <!-- 代码模块 -->
     <section class="group">
-      <h4 class="title">🧩 代码模块</h4>
+      <h4 class="title">{{ $t('sidebar.codeModules') }}</h4>
       <button
         v-for="m in modules"
         :key="m"
@@ -27,9 +27,11 @@
 </template>
 
 <script setup lang="ts">
-/* 你的原脚本完全保留，无需改动 */
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { listModules } from '@/api'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{ select: [key: string] }>()
 const props = defineProps<{ project: string }>()
