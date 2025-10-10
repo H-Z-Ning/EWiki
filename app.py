@@ -131,7 +131,7 @@ def import_project(src_path: str) -> str:
 # 如你原来没定义，请加一行：
 # log = logging.getLogger("EWiki_mini")
 
-def build_wiki(project: str) -> None:
+def build_wiki(project: str, language: str = "zh") -> None:
     """
     1. 拷贝到 repos/
     2. 解析文件树 + README
@@ -153,7 +153,7 @@ def build_wiki(project: str) -> None:
     data_out.mkdir(parents=True, exist_ok=True)
     java_callgraph_stone.mkdir(parents=True, exist_ok=True)
     source_code_stone.mkdir(parents=True, exist_ok=True)
-    log.info("[build_wiki] >>> project=%s | src=%s | out=%s| data_out=%s| source_code_stone=%s", project, src, out, data_out,source_code_stone)
+    log.info("[build_wiki] >>> project=%s | language=%s | src=%s | out=%s", project, language, src, out)
 
     # ---------- 1. 文件树 & README ----------
     file_tree = "\n".join(
@@ -168,8 +168,7 @@ def build_wiki(project: str) -> None:
     # ---------- 2. RAG 实例 ----------
     # ---------- 3. 生成 wiki 结构 ----------
     try:
-        print("---------------"+str(out))
-        plan_xml = plan_wiki_structure(project,file_tree, readme, src, source_code_stone, java_callgraph_stone)
+        plan_xml = plan_wiki_structure(project, file_tree, readme, src, source_code_stone, java_callgraph_stone, language)
         log.info("[build_wiki] plan_xml=\n%.10000s...", plan_xml)
     except Exception as e:
         log.exception("[build_wiki] plan_wiki_structure failed")
@@ -201,10 +200,10 @@ def build_wiki(project: str) -> None:
 
     # ---------- 5. 逐页生成 markdown ----------
     module_docs: Dict[str, str] = {}
-    for pid, title,description, file_paths in pages:
+    for pid, title, description, file_paths in pages:
         log.info("[build_wiki] ---- generate page | id=%s title=%s files=%s", pid, title, file_paths)
         try:
-            md = write_page(title, description,file_paths, src, source_code_stone, java_callgraph_stone)
+            md = write_page(title, description, file_paths, src, source_code_stone, java_callgraph_stone, language)
             module_docs[pid] = md
             log.info("[build_wiki] page done | id=%s len=%s", pid, len(md))
         except Exception as e:
@@ -231,7 +230,12 @@ def build_wiki(project: str) -> None:
         wiki_lines = "\n".join(summaries)
         log.info("[build_wiki] generating PROJECT.md ...")
         try:
-            readme = write_page_from_dir("项目总览", wiki_lines, out / "modules", src, source_code_stone, java_callgraph_stone)
+            if language == "en":
+                readme = write_page_from_dir("Project Overview", wiki_lines, out / "modules", src, source_code_stone,
+                                             java_callgraph_stone, language)
+            else:
+                readme = write_page_from_dir("项目总览", wiki_lines, out / "modules", src, source_code_stone,
+                                             java_callgraph_stone, language)
             project_md.write_text(readme, encoding="utf-8")
             log.info("[build_wiki] PROJECT.md done | len=%s", len(readme))
         except Exception as e:
@@ -268,6 +272,7 @@ async def startup_event():
 # ~~~~~~~~~~~~~~ 项目级 ~~~~~~~~~~~~~~
 class ImportReq(BaseModel):
     path: str
+    language: str = "zh"  # 默认中文
 
 @app.get("/api/projects")
 def list_projects():
@@ -282,7 +287,7 @@ async def import_and_build(req: ImportReq):
         # >>> 新增：已有 wiki 直接返回
         if (OUTPUT_BASE / name / "PROJECT.md").exists():
             return {"project": name, "message": "wiki already exists"}
-        build_wiki(name)
+        build_wiki(name, req.language)  # 传递语言参数
         return {"project": name}
     except Exception as e:
         log.exception("import failed")
@@ -697,7 +702,7 @@ class FileUploadReq(BaseModel):
 
 
 @app.post("/api/upload")
-async def upload_and_build(file: UploadFile = File(...)):
+async def upload_and_build(file: UploadFile = File(...), language: str = "zh"):
     """上传压缩文件并生成 Wiki"""
     try:
         # 检查文件类型
@@ -710,7 +715,7 @@ async def upload_and_build(file: UploadFile = File(...)):
                 detail=f"不支持的文件格式。支持格式: {', '.join(allowed_extensions)}"
             )
 
-        # 使用文件名作为项目名（不添加时间戳和随机数）
+        # 使用文件名作为项目名
         project_name = Path(file.filename).stem
 
         # 创建项目目录
@@ -750,10 +755,12 @@ async def upload_and_build(file: UploadFile = File(...)):
 
             # 删除原始压缩文件
             uploaded_file_path.unlink()
+
         if (OUTPUT_BASE / project_name / "PROJECT.md").exists():
             return {"project": project_name, "message": "wiki already exists"}
-        # 构建 Wiki（如果已存在会覆盖）
-        build_wiki(project_name)
+
+        # 构建 Wiki（传递语言参数）
+        build_wiki(project_name, language)
 
         return {"project": project_name}
     except HTTPException:
