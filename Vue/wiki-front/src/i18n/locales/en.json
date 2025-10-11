@@ -24,7 +24,8 @@
     "edit": "Edit",
     "search": "Search",
     "settings": "Settings",
-    "language": "Language"
+    "language": "Language",
+    "cancelling": "Cancelling..."
   },
   "home": {
     "title": "EWiki",
@@ -48,7 +49,8 @@
     "english": "English",
     "endoclang": "English Documentation",
     "zhdoclang": "Chinese Documentation",
-    "languageHint": "Select the language for generated Wiki documentation"
+    "languageHint": "Select the language for generated Wiki documentation",
+    "generatingWiki": "Generating Wiki..."
   },
   "sidebar": {
     "repoOverview": "📚 Repository Overview",
