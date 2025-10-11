@@ -13,7 +13,7 @@
     <section class="glass import-card">
       <h3>{{ $t('home.importProject') }}</h3>
 
-      <!-- 选项卡 - 修改顺序，文件上传在左边 -->
+      <!-- 选项卡 -->
       <div class="tab-buttons">
         <button
           class="tab-button"
@@ -31,7 +31,7 @@
         </button>
       </div>
 
-      <!-- Wiki 语言选择 - 优化版本，高度降低 -->
+      <!-- Wiki 语言选择 -->
       <div class="language-selection compact">
         <div class="language-header">
           <span class="language-icon">🌐</span>
@@ -69,7 +69,8 @@
           </div>
         </div>
       </div>
-      <!-- 文件上传 - 默认显示 -->
+
+      <!-- 文件上传 -->
       <div v-if="activeTab === 'upload'" class="upload-box">
         <div class="upload-area" @click="triggerFileInput" @drop="handleDrop" @dragover.prevent>
           <input
@@ -117,7 +118,6 @@
           <span v-else>{{ $t('common.generating') }}</span>
         </button>
       </div>
-
     </section>
 
     <!-- 已有项目 -->
@@ -155,6 +155,65 @@
       </div>
     </section>
 
+    <!-- 进度条模态框 -->
+    <div v-if="showProgress" class="progress-modal-overlay">
+      <div class="progress-modal-content">
+        <div class="progress-modal-header">
+          <h3>{{ $t('home.generatingWiki') }}</h3>
+        </div>
+        <div class="progress-modal-body">
+          <!-- 进度条 -->
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div 
+                class="progress-fill" 
+                :style="{ width: progress + '%' }"
+              ></div>
+            </div>
+            <div class="progress-info">
+              <span class="progress-percentage">{{ progress }}%</span>
+              <span class="progress-message">{{ progressMessage }}</span>
+            </div>
+          </div>
+
+          <!-- 详细进度信息 -->
+          <div v-if="progressDetails" class="progress-details">
+            <div v-if="progressDetails.current_page && progressDetails.total_pages">
+              <p>正在生成页面: {{ progressDetails.current_page }}/{{ progressDetails.total_pages }}</p>
+            </div>
+          </div>
+
+          <!-- 完成信息 -->
+          <div v-if="progressStage === 'completed'" class="success-message">
+            <p>✅ {{ progressMessage }}</p>
+            <p class="redirect-hint">即将跳转到项目页面...</p>
+          </div>
+
+          <!-- 错误信息 -->
+          <div v-if="progressStage === 'error'" class="error-message">
+            <p>❌ {{ progressMessage }}</p>
+          </div>
+        </div>
+        <div class="progress-modal-actions">
+          <button 
+            v-if="progressStage === 'error' || progressStage === 'completed'" 
+            class="btn-primary" 
+            @click="closeProgress"
+          >
+            {{ progressStage === 'completed' ? '立即查看' : $t('common.close') }}
+          </button>
+          <button 
+            v-else 
+            class="btn-secondary" 
+            @click="cancelGeneration"
+            :disabled="cancelling"
+          >
+            {{ cancelling ? $t('common.cancelling') : $t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 删除确认对话框 -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDelete">
       <div class="modal-content" @click.stop>
@@ -177,183 +236,402 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import axios from 'axios'
-import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
-
-const { t } = useI18n()
-
-interface Project {
-  name: string;
-}
-
-/* 数据 */
-const router = useRouter()
-const path = ref('')
-const running = ref(false)
-const projects = ref<Project[]>([])
-const activeTab = ref('upload') // 修改：默认选择文件上传
-const selectedFile = ref<File | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
-const wikiLanguage = ref('en') // 修改：默认选择英语
-
-// 删除相关状态保持不变
-const showDeleteConfirm = ref(false)
-const projectToDelete = ref('')
-const deleting = ref(false)
-
-/* 方法 */
-const loadList = async () => {
-  try {
-    const response = await axios.get('/api/projects')
-    projects.value = Array.isArray(response.data)
-      ? response.data.map((name: string) => ({ name }))
-      : response.data
-  } catch (error) {
-    console.error(t('errors.loadFailed'), error)
-    projects.value = []
+  import { ref, onMounted, onUnmounted } from 'vue'
+  import { useRouter } from 'vue-router'
+  import { useI18n } from 'vue-i18n'
+  import axios from 'axios'
+  import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
+  
+  const { t } = useI18n()
+  
+  interface Project {
+    name: string;
   }
-}
-
-const doImport = async () => {
-  if (!path.value.trim()) return
-  running.value = true
-  try {
-    const { data } = await axios.post('/api/import', {
-      path: path.value.trim(),
-      language: wikiLanguage.value
-    })
-    await loadList()
-    router.push(`/wiki/${data.project}`)
-  } catch (error) {
-    console.error(t('errors.importFailed'), error)
-    alert(t('errors.importFailed'))
-  } finally {
-    running.value = false
+  
+  interface ProgressData {
+    stage: string;
+    progress: number;
+    message: string;
+    current_page?: number;
+    total_pages?: number;
   }
-}
-
-const triggerFileInput = () => {
-  fileInput.value?.click()
-}
-
-const handleFileSelect = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  if (target.files && target.files[0]) {
-    const file = target.files[0]
-    if (isValidArchiveFile(file)) {
-      selectedFile.value = file
-    } else {
-      alert(t('errors.fileTypeError'))
-      clearFile()
+  
+  /* 数据 */
+  const router = useRouter()
+  const path = ref('')
+  const running = ref(false)
+  const projects = ref<Project[]>([])
+  const activeTab = ref('upload')
+  const selectedFile = ref<File | null>(null)
+  const fileInput = ref<HTMLInputElement | null>(null)
+  const wikiLanguage = ref('en')
+  
+  // 进度相关状态
+  const showProgress = ref(false)
+  const progress = ref(0)
+  const progressMessage = ref('')
+  const progressStage = ref('')
+  const progressDetails = ref<any>(null)
+  const currentProject = ref('')
+  const websocket = ref<WebSocket | null>(null)
+  const cancelling = ref(false)
+  const completedProject = ref('') // 新增：存储完成的项目名
+  
+  // 删除相关状态
+  const showDeleteConfirm = ref(false)
+  const projectToDelete = ref('')
+  const deleting = ref(false)
+  
+  /* 方法 */
+  const loadList = async () => {
+    try {
+      const response = await axios.get('/api/projects')
+      projects.value = Array.isArray(response.data)
+        ? response.data.map((name: string) => ({ name }))
+        : response.data
+    } catch (error) {
+      console.error(t('errors.loadFailed'), error)
+      projects.value = []
     }
   }
-}
-
-const handleDrop = (event: DragEvent) => {
-  event.preventDefault()
-  if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
-    const file = event.dataTransfer.files[0]
-    if (isValidArchiveFile(file)) {
-      selectedFile.value = file
-    } else {
-      alert(t('errors.fileTypeError'))
-      clearFile()
-    }
-  }
-}
-
-const isValidArchiveFile = (file: File): boolean => {
-  const allowedTypes = [
-    'application/zip',
-    'application/x-zip-compressed',
-    'application/x-rar-compressed',
-    'application/x-7z-compressed'
-  ]
-  const allowedExtensions = ['.zip', '.rar', '.7z']
-
-  const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
-
-  return allowedTypes.includes(file.type) ||
-         (fileExtension && allowedExtensions.includes(fileExtension))
-}
-
-const clearFile = () => {
-  selectedFile.value = null
-  if (fileInput.value) {
-    fileInput.value.value = ''
-  }
-}
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-const doUpload = async () => {
-  if (!selectedFile.value) return
-
-  running.value = true
-  try {
-    const formData = new FormData()
-    formData.append('file', selectedFile.value)
-    formData.append('language', wikiLanguage.value)
-
-    const { data } = await axios.post('/api/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+  
+  const setupWebSocket = (project: string) => {
+    return new Promise((resolve, reject) => {
+      // 获取WebSocket URL
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const host = window.location.host
+      const wsUrl = `${protocol}//${host}/ws/progress/${project}`
+      
+      console.log('Connecting to WebSocket:', wsUrl)
+      
+      websocket.value = new WebSocket(wsUrl)
+      
+      websocket.value.onopen = () => {
+        console.log('WebSocket connected for progress updates')
+        resolve(true)
+      }
+      
+      websocket.value.onmessage = (event) => {
+        try {
+          const data: ProgressData = JSON.parse(event.data)
+          console.log('Received progress:', data)
+          handleProgressUpdate(data)
+        } catch (error) {
+          console.error('Failed to parse progress data:', error)
+        }
+      }
+      
+      websocket.value.onerror = (error) => {
+        console.error('WebSocket error:', error)
+        reject(error)
+      }
+      
+      websocket.value.onclose = () => {
+        console.log('WebSocket disconnected')
       }
     })
-
-    await loadList()
-    router.push(`/wiki/${data.project}`)
-  } catch (error: any) {
-    console.error(t('errors.uploadFailed'), error)
-    alert(`${t('errors.uploadFailed')}: ${error.response?.data?.detail || t('errors.requestFailed')}`)
-  } finally {
-    running.value = false
   }
-}
-
-const goWiki = (p: string) => router.push(`/wiki/${p}`)
-
-// 删除项目相关方法
-const confirmDelete = (projectName: string) => {
-  projectToDelete.value = projectName
-  showDeleteConfirm.value = true
-}
-
-const cancelDelete = () => {
-  showDeleteConfirm.value = false
-  projectToDelete.value = ''
-  deleting.value = false
-}
-
-const doDelete = async () => {
-  if (!projectToDelete.value) return
-
-  deleting.value = true
-  try {
-    await axios.delete(`/api/projects/${projectToDelete.value}`)
-    await loadList()
-    cancelDelete()
-  } catch (error: any) {
-    console.error(t('errors.deleteFailed'), error)
-    alert(`${t('errors.deleteFailed')}: ${error.response?.data?.detail || t('errors.requestFailed')}`)
-    cancelDelete()
+  
+  const handleProgressUpdate = (data: ProgressData) => {
+    progress.value = data.progress
+    progressMessage.value = data.message
+    progressStage.value = data.stage
+    
+    // 更新详细进度信息
+    if (data.current_page && data.total_pages) {
+      progressDetails.value = {
+        current_page: data.current_page,
+        total_pages: data.total_pages
+      }
+    }
+    
+    // 处理完成状态
+    if (data.stage === 'completed') {
+      running.value = false
+      completedProject.value = currentProject.value
+      
+      // 完成后延迟跳转，让用户看到完成消息
+      setTimeout(() => {
+        if (showProgress.value) {
+          closeProgress()
+          // 确保项目名正确后再跳转
+          const projectToNavigate = completedProject.value || currentProject.value
+          if (projectToNavigate) {
+            console.log('跳转到项目:', projectToNavigate)
+            router.push(`/wiki/${projectToNavigate}`)
+          }
+        }
+      }, 1000) // 1秒后跳转，让用户看到完成状态
+    }
+    
+    // 处理错误状态
+    if (data.stage === 'error') {
+      running.value = false
+      // 错误时不自动关闭，让用户看到错误信息
+    }
   }
-}
-
-/* 生命周期 */
-onMounted(() => {
-  loadList()
-})
-</script>
+  
+  const closeProgress = () => {
+    showProgress.value = false
+    progress.value = 0
+    progressMessage.value = ''
+    progressStage.value = ''
+    progressDetails.value = null
+    currentProject.value = ''
+    completedProject.value = ''
+    
+    if (websocket.value) {
+      websocket.value.close()
+      websocket.value = null
+    }
+  }
+  
+  const cancelGeneration = async () => {
+    cancelling.value = true
+    try {
+      // 这里可以添加取消生成的API调用
+      // await axios.post(`/api/projects/${currentProject.value}/cancel`)
+      
+      // 直接关闭进度显示
+      closeProgress()
+      running.value = false
+    } catch (error) {
+      console.error('取消生成失败:', error)
+    } finally {
+      cancelling.value = false
+    }
+  }
+  
+  const doImport = async () => {
+    if (!path.value.trim()) return
+    running.value = true
+    
+    try {
+      // 从路径中提取项目名
+      const pathParts = path.value.trim().split(/[\\/]/)
+      const projectName = pathParts[pathParts.length - 1] || 'untitled'
+      currentProject.value = projectName
+      
+      // 显示进度条
+      showProgress.value = true
+      progress.value = 0
+      progressMessage.value = '准备开始...'
+      
+      // 设置WebSocket连接
+      await setupWebSocket(projectName)
+      
+      const { data } = await axios.post('/api/import', {
+        path: path.value.trim(),
+        language: wikiLanguage.value
+      })
+      
+      console.log('导入API返回:', data)
+      
+      // 更新项目名为API返回的项目名（可能和路径提取的不同）
+      if (data.project && data.project !== currentProject.value) {
+        currentProject.value = data.project
+        console.log('更新项目名为:', data.project)
+      }
+      
+      await loadList()
+      
+      // 如果WebSocket没有收到完成消息，设置超时处理
+      const timeout = setTimeout(() => {
+        if (showProgress.value && progressStage.value !== 'completed' && progressStage.value !== 'error') {
+          console.log('WebSocket超时，强制完成')
+          closeProgress()
+          const finalProject = data.project || currentProject.value
+          if (finalProject) {
+            router.push(`/wiki/${finalProject}`)
+          }
+        }
+      }, 120000) // 2分钟超时
+      
+      // 监听完成状态来清除超时
+      const checkComplete = setInterval(() => {
+        if (!showProgress.value || progressStage.value === 'completed' || progressStage.value === 'error') {
+          clearTimeout(timeout)
+          clearInterval(checkComplete)
+        }
+      }, 1000)
+      
+    } catch (error: any) {
+      console.error(t('errors.importFailed'), error)
+      alert(t('errors.importFailed'))
+      closeProgress()
+      running.value = false
+    }
+  }
+  
+  const doUpload = async () => {
+    if (!selectedFile.value) return
+  
+    running.value = true
+    
+    try {
+      const projectName = selectedFile.value.name.replace(/\.[^/.]+$/, "") // 移除扩展名
+      currentProject.value = projectName
+      
+      // 显示进度条
+      showProgress.value = true
+      progress.value = 0
+      progressMessage.value = '准备开始...'
+      
+      // 设置WebSocket连接
+      await setupWebSocket(projectName)
+      
+      const formData = new FormData()
+      formData.append('file', selectedFile.value)
+      formData.append('language', wikiLanguage.value)
+  
+      const { data } = await axios.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+  
+      console.log('上传API返回:', data)
+      
+      // 更新项目名为API返回的项目名
+      if (data.project && data.project !== currentProject.value) {
+        currentProject.value = data.project
+        console.log('更新项目名为:', data.project)
+      }
+      
+      await loadList()
+      
+      // 如果WebSocket没有收到完成消息，设置超时处理
+      const timeout = setTimeout(() => {
+        if (showProgress.value && progressStage.value !== 'completed' && progressStage.value !== 'error') {
+          console.log('WebSocket超时，强制完成')
+          closeProgress()
+          const finalProject = data.project || currentProject.value
+          if (finalProject) {
+            router.push(`/wiki/${finalProject}`)
+          }
+        }
+      }, 120000) // 2分钟超时
+      
+      // 监听完成状态来清除超时
+      const checkComplete = setInterval(() => {
+        if (!showProgress.value || progressStage.value === 'completed' || progressStage.value === 'error') {
+          clearTimeout(timeout)
+          clearInterval(checkComplete)
+        }
+      }, 1000)
+      
+    } catch (error: any) {
+      console.error(t('errors.uploadFailed'), error)
+      alert(`${t('errors.uploadFailed')}: ${error.response?.data?.detail || t('errors.requestFailed')}`)
+      closeProgress()
+      running.value = false
+    }
+  }
+  
+  // 其他方法保持不变...
+  const triggerFileInput = () => {
+    fileInput.value?.click()
+  }
+  
+  const handleFileSelect = (event: Event) => {
+    const target = event.target as HTMLInputElement
+    if (target.files && target.files[0]) {
+      const file = target.files[0]
+      if (isValidArchiveFile(file)) {
+        selectedFile.value = file
+      } else {
+        alert(t('errors.fileTypeError'))
+        clearFile()
+      }
+    }
+  }
+  
+  const handleDrop = (event: DragEvent) => {
+    event.preventDefault()
+    if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
+      const file = event.dataTransfer.files[0]
+      if (isValidArchiveFile(file)) {
+        selectedFile.value = file
+      } else {
+        alert(t('errors.fileTypeError'))
+        clearFile()
+      }
+    }
+  }
+  
+  const isValidArchiveFile = (file: File): boolean => {
+    const allowedTypes = [
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/x-rar-compressed',
+      'application/x-7z-compressed'
+    ]
+    const allowedExtensions = ['.zip', '.rar', '.7z']
+  
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+  
+    return allowedTypes.includes(file.type) ||
+           (fileExtension && allowedExtensions.includes(fileExtension))
+  }
+  
+  const clearFile = () => {
+    selectedFile.value = null
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+  }
+  
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+  
+  const goWiki = (p: string) => {
+    console.log('跳转到项目:', p)
+    router.push(`/wiki/${p}`)
+  }
+  
+  // 删除项目相关方法
+  const confirmDelete = (projectName: string) => {
+    projectToDelete.value = projectName
+    showDeleteConfirm.value = true
+  }
+  
+  const cancelDelete = () => {
+    showDeleteConfirm.value = false
+    projectToDelete.value = ''
+    deleting.value = false
+  }
+  
+  const doDelete = async () => {
+    if (!projectToDelete.value) return
+  
+    deleting.value = true
+    try {
+      await axios.delete(`/api/projects/${projectToDelete.value}`)
+      await loadList()
+      cancelDelete()
+    } catch (error: any) {
+      console.error(t('errors.deleteFailed'), error)
+      alert(`${t('errors.deleteFailed')}: ${error.response?.data?.detail || t('errors.requestFailed')}`)
+      cancelDelete()
+    }
+  }
+  
+  /* 生命周期 */
+  onMounted(() => {
+    loadList()
+  })
+  
+  onUnmounted(() => {
+    if (websocket.value) {
+      websocket.value.close()
+    }
+  })
+  </script>
 
 <style scoped>
 /* 基础重置 */
@@ -1472,4 +1750,475 @@ onMounted(() => {
   line-height: 1.2;
 }
 */
+/* 进度条样式 */
+.progress-modal {
+  max-width: 500px;
+}
+
+.progress-container {
+  margin: 20px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.progress-percentage {
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+.progress-message {
+  color: #6b7280;
+  text-align: right;
+}
+
+.progress-details {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #f8fafc;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #475569;
+}
+
+/* 模态框样式调整 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.btn-primary {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+/* 进度条模态框样式 */
+.progress-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.progress-modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 500px;
+  width: 90%;
+  animation: modal-appear 0.3s ease-out;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.progress-modal-header h3 {
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  color: #1f2937;
+}
+
+.progress-modal-body {
+  margin: 20px 0;
+}
+
+.progress-container {
+  margin: 20px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background-color: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  border-radius: 6px;
+  transition: width 0.5s ease-in-out;
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.progress-percentage {
+  font-weight: 700;
+  color: #4f46e5;
+  font-size: 16px;
+}
+
+.progress-message {
+  color: #6b7280;
+  text-align: right;
+  flex: 1;
+  margin-left: 16px;
+}
+
+.progress-details {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #475569;
+  border-left: 4px solid #4f46e5;
+}
+
+.error-message {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #fef2f2;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #dc2626;
+  border-left: 4px solid #dc2626;
+}
+
+.progress-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.btn-primary {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #4338ca;
+}
+
+.btn-secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #e5e7eb;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 确保其他模态框样式不冲突 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  width: 90%;
+}
+/* 进度条模态框样式 */
+.progress-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.progress-modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 500px;
+  width: 90%;
+  animation: modal-appear 0.3s ease-out;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.progress-modal-header h3 {
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  color: #1f2937;
+}
+
+.progress-modal-body {
+  margin: 20px 0;
+}
+
+.progress-container {
+  margin: 20px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background-color: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  border-radius: 6px;
+  transition: width 0.5s ease-in-out;
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.progress-percentage {
+  font-weight: 700;
+  color: #4f46e5;
+  font-size: 16px;
+}
+
+.progress-message {
+  color: #6b7280;
+  text-align: right;
+  flex: 1;
+  margin-left: 16px;
+}
+
+.progress-details {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #475569;
+  border-left: 4px solid #4f46e5;
+}
+
+.success-message {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #f0fdf4;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #166534;
+  border-left: 4px solid #22c55e;
+}
+
+.success-message .redirect-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.error-message {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #fef2f2;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #dc2626;
+  border-left: 4px solid #dc2626;
+}
+
+.progress-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.btn-primary {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #4338ca;
+}
+
+.btn-secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #e5e7eb;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 确保其他模态框样式不冲突 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  width: 90%;
+}
 </style>
