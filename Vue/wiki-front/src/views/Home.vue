@@ -13,15 +13,8 @@
     <section class="glass import-card">
       <h3>{{ $t('home.importProject') }}</h3>
 
-      <!-- 选项卡 -->
+      <!-- 选项卡 - 修改顺序，文件上传在左边 -->
       <div class="tab-buttons">
-        <button
-          class="tab-button"
-          :class="{ active: activeTab === 'local' }"
-          @click="activeTab = 'local'"
-        >
-          {{ $t('home.localPath') }}
-        </button>
         <button
           class="tab-button"
           :class="{ active: activeTab === 'upload' }"
@@ -29,30 +22,23 @@
         >
           {{ $t('home.fileUpload') }}
         </button>
+        <button
+          class="tab-button"
+          :class="{ active: activeTab === 'local' }"
+          @click="activeTab = 'local'"
+        >
+          {{ $t('home.localPath') }}
+        </button>
       </div>
 
-      <!-- Wiki 语言选择 - 优化版本 -->
-      <div class="language-selection">
+      <!-- Wiki 语言选择 - 优化版本，高度降低 -->
+      <div class="language-selection compact">
         <div class="language-header">
           <span class="language-icon">🌐</span>
           <span class="language-title">{{ $t('home.wikiLanguage') }}</span>
           <span class="language-hint">{{ $t('home.languageHint') }}</span>
         </div>
         <div class="language-options">
-          <div
-            class="lang-card"
-            :class="{ active: wikiLanguage === 'zh' }"
-            @click="wikiLanguage = 'zh'"
-          >
-            <div class="lang-flag">🇨🇳</div>
-            <div class="lang-info">
-              <div class="lang-name">{{ $t('home.chinese') }}</div>
-              <div class="lang-desc">{{ $t('home.zhdoclang') }}</div>
-            </div>
-            <div class="lang-check">
-              <div class="check-icon" v-if="wikiLanguage === 'zh'">✓</div>
-            </div>
-          </div>
           <div
             class="lang-card"
             :class="{ active: wikiLanguage === 'en' }"
@@ -67,23 +53,23 @@
               <div class="check-icon" v-if="wikiLanguage === 'en'">✓</div>
             </div>
           </div>
+          <div
+            class="lang-card"
+            :class="{ active: wikiLanguage === 'zh' }"
+            @click="wikiLanguage = 'zh'"
+          >
+            <div class="lang-flag">🇨🇳</div>
+            <div class="lang-info">
+              <div class="lang-name">{{ $t('home.chinese') }}</div>
+              <div class="lang-desc">{{ $t('home.zhdoclang') }}</div>
+            </div>
+            <div class="lang-check">
+              <div class="check-icon" v-if="wikiLanguage === 'zh'">✓</div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <!-- 本地路径输入 -->
-      <div v-if="activeTab === 'local'" class="input-box">
-        <input
-          v-model="path"
-          :placeholder="$t('home.pathPlaceholder')"
-          @keyup.enter="doImport"
-        />
-        <button class="primary" @click="doImport" :disabled="running">
-          <span v-if="!running">{{ $t('home.generateWiki') }}</span>
-          <span v-else>{{ $t('common.generating') }}</span>
-        </button>
-      </div>
-
-      <!-- 文件上传 -->
+      <!-- 文件上传 - 默认显示 -->
       <div v-if="activeTab === 'upload'" class="upload-box">
         <div class="upload-area" @click="triggerFileInput" @drop="handleDrop" @dragover.prevent>
           <input
@@ -118,6 +104,20 @@
           <span v-else>{{ $t('common.generating') }}</span>
         </button>
       </div>
+
+      <!-- 本地路径输入 -->
+      <div v-if="activeTab === 'local'" class="input-box">
+        <input
+          v-model="path"
+          :placeholder="$t('home.pathPlaceholder')"
+          @keyup.enter="doImport"
+        />
+        <button class="primary" @click="doImport" :disabled="running">
+          <span v-if="!running">{{ $t('home.generateWiki') }}</span>
+          <span v-else>{{ $t('common.generating') }}</span>
+        </button>
+      </div>
+
     </section>
 
     <!-- 已有项目 -->
@@ -194,10 +194,10 @@ const router = useRouter()
 const path = ref('')
 const running = ref(false)
 const projects = ref<Project[]>([])
-const activeTab = ref('local')
+const activeTab = ref('upload') // 修改：默认选择文件上传
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
-const wikiLanguage = ref('zh') // 新增：Wiki语言选择
+const wikiLanguage = ref('en') // 修改：默认选择英语
 
 // 删除相关状态保持不变
 const showDeleteConfirm = ref(false)
@@ -223,7 +223,7 @@ const doImport = async () => {
   try {
     const { data } = await axios.post('/api/import', {
       path: path.value.trim(),
-      language: wikiLanguage.value // 新增这一行
+      language: wikiLanguage.value
     })
     await loadList()
     router.push(`/wiki/${data.project}`)
@@ -302,7 +302,7 @@ const doUpload = async () => {
   try {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
-    formData.append('language', wikiLanguage.value) // 新增这一行
+    formData.append('language', wikiLanguage.value)
 
     const { data } = await axios.post('/api/upload', formData, {
       headers: {
@@ -438,6 +438,7 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   width: 100%;
+  margin-top: 12px;
 }
 
 .input-box input {
@@ -612,6 +613,7 @@ onMounted(() => {
 .upload-box {
   display: flex;
   flex-direction: column;
+  margin-top: 20px;
   gap: 16px;
 }
 
@@ -931,36 +933,41 @@ onMounted(() => {
   margin: 0;
 }
 
-/* ==================== 优化的语言选择样式 ==================== */
+/* ==================== 优化的语言选择样式 - 降低高度 ==================== */
 .language-selection {
-  margin-bottom: 24px;
-  padding: 20px;
+  margin-top: 20px;
+  padding: 10px 14px; /* 进一步减少内边距 */
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  border-radius: 10px; /* 稍微减小圆角 */
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
+}
+
+/* 紧凑版本 */
+.language-selection.compact {
+  padding: 12px 16px;
 }
 
 .language-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .language-icon {
-  font-size: 20px;
+  font-size: 18px;
   opacity: 0.9;
 }
 
 .language-title {
   font-weight: 600;
-  font-size: 16px;
+  font-size: 15px;
   color: #fff;
 }
 
 .language-hint {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.7;
   color: rgba(255, 255, 255, 0.8);
   margin-left: auto;
@@ -969,17 +976,17 @@ onMounted(() => {
 .language-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .lang-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -1015,7 +1022,7 @@ onMounted(() => {
 }
 
 .lang-flag {
-  font-size: 24px;
+  font-size: 20px;
   flex-shrink: 0;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
@@ -1027,20 +1034,20 @@ onMounted(() => {
 
 .lang-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: #fff;
   margin-bottom: 2px;
 }
 
 .lang-desc {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.8;
   color: rgba(255, 255, 255, 0.9);
 }
 
 .lang-check {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1048,15 +1055,15 @@ onMounted(() => {
 }
 
 .check-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   background: #10b981;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: bold;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
   animation: checkPop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1085,26 +1092,384 @@ onMounted(() => {
   .language-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
   }
 
   .language-hint {
     margin-left: 0;
-    font-size: 11px;
+    font-size: 10px;
+  }
+
+  .lang-card {
+    padding: 10px;
+  }
+}
+
+@media (min-width: 768px) {
+  .language-options {
+    gap: 12px;
   }
 
   .lang-card {
     padding: 14px;
   }
 }
+/* ==================== 进一步降低高度的语言选择样式 ==================== */
+.language-selection {
+  margin-top: 20px;
+  padding: 10px 14px; /* 进一步减少内边距 */
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px; /* 稍微减小圆角 */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.language-header {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* 减少间距 */
+  margin-bottom: 10px; /* 减少底部间距 */
+}
+
+.language-icon {
+  font-size: 16px; /* 进一步缩小图标 */
+  opacity: 0.9;
+}
+
+.language-title {
+  font-weight: 600;
+  font-size: 14px; /* 进一步缩小字体 */
+  color: #fff;
+}
+
+.language-hint {
+  font-size: 10px; /* 进一步缩小提示文字 */
+  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.8);
+  margin-left: auto;
+}
+
+.language-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px; /* 减少选项间距 */
+}
+
+.lang-card {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 减少内部元素间距 */
+  padding: 10px; /* 进一步减少内边距 */
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px; /* 减小圆角 */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.lang-flag {
+  font-size: 18px; /* 进一步缩小国旗图标 */
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.lang-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.lang-name {
+  font-weight: 600;
+  font-size: 12px; /* 进一步缩小字体 */
+  color: #fff;
+  margin-bottom: 1px; /* 减少底部间距 */
+}
+
+.lang-desc {
+  font-size: 10px; /* 进一步缩小描述文字 */
+  opacity: 0.8;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.lang-check {
+  width: 16px; /* 进一步缩小勾选框 */
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.check-icon {
+  width: 12px; /* 进一步缩小勾选图标 */
+  height: 12px;
+  background: #10b981;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 8px; /* 进一步缩小勾号 */
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+  animation: checkPop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 移动端响应式调整 */
+@media (max-width: 600px) {
+  .language-selection {
+    padding: 8px 12px; /* 移动端进一步减少内边距 */
+  }
+  
+  .language-header {
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  
+  .lang-card {
+    padding: 8px; /* 移动端进一步减少内边距 */
+    gap: 6px;
+  }
+}
 
 @media (min-width: 768px) {
   .language-options {
-    gap: 16px;
+    gap: 10px; /* 桌面端保持适当间距 */
   }
-
+  
   .lang-card {
-    padding: 18px;
+    padding: 12px; /* 桌面端保持适当内边距 */
   }
 }
+/* 上传区域样式 - 降低高度版本 */
+.upload-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* 减少整体间距 */
+}
+
+.upload-area {
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 10px; /* 稍微减小圆角 */
+  padding: 24px 16px; /* 大幅减少内边距，特别是上下内边距 */
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: rgba(255, 255, 255, 0.05);
+  min-height: auto; /* 确保没有最小高度限制 */
+}
+
+.upload-area:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px; /* 减少内容间距 */
+}
+
+.upload-icon {
+  font-size: 24px; /* 缩小上传图标 */
+  opacity: 0.7;
+  margin-bottom: 2px; /* 可选：添加一点底部间距 */
+}
+
+.upload-text {
+  margin: 0;
+  font-size: 14px; /* 缩小文字 */
+  font-weight: 500;
+  color: #fff;
+  line-height: 1.3; /* 减少行高 */
+}
+
+.upload-hint {
+  margin: 0;
+  font-size: 12px; /* 缩小提示文字 */
+  opacity: 0.7;
+  color: #fff;
+  line-height: 1.2; /* 减少行高 */
+}
+
+/* 文件信息样式 - 如果需要也可以降低高度 */
+.file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px; /* 减小圆角 */
+  padding: 10px 12px; /* 减少内边距 */
+  margin-top: 4px; /* 减少顶部间距 */
+}
+
+.file-details {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* 减少元素间距 */
+  flex: 1;
+  min-width: 0;
+}
+
+.file-name {
+  font-weight: 500;
+  font-size: 13px; /* 稍微缩小文件名 */
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  opacity: 0.7;
+  font-size: 12px; /* 缩小文件大小文字 */
+  flex-shrink: 0;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 18px; /* 稍微缩小删除按钮 */
+  cursor: pointer;
+  padding: 3px 6px; /* 减少内边距 */
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-family: inherit;
+  line-height: 1;
+  width: 28px; /* 缩小按钮尺寸 */
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.upload-btn {
+  align-self: flex-end;
+  margin-top: 4px; /* 减少顶部间距 */
+  padding: 10px 20px; /* 如果需要也可以缩小按钮 */
+  font-size: 14px; /* 缩小按钮文字 */
+}
+
+/* 移动端响应式调整 */
+@media (max-width: 600px) {
+  .upload-area {
+    padding: 20px 12px; /* 移动端进一步减少内边距 */
+  }
+  
+  .upload-icon {
+    font-size: 20px; /* 移动端进一步缩小图标 */
+  }
+  
+  .upload-text {
+    font-size: 13px; /* 移动端进一步缩小文字 */
+  }
+  
+  .upload-hint {
+    font-size: 11px; /* 移动端进一步缩小提示 */
+  }
+  
+  .file-info {
+    padding: 8px 10px; /* 移动端进一步减少内边距 */
+  }
+  
+  .upload-btn {
+    padding: 8px 16px; /* 移动端缩小按钮 */
+    font-size: 13px;
+  }
+}
+/* Hero 区域 - 降低高度版本 */
+.hero {
+  text-align: center;
+  color: #fff;
+  margin-bottom: 16px; /* 减少底部外边距 */
+  padding: 0; /* 移除内边距 */
+}
+
+.hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px; /* 减少元素间距 */
+  margin-bottom: 12px; /* 减少底部间距 */
+}
+
+.title {
+  font-size: 36px; /* 大幅缩小标题字体 */
+  font-weight: 700;
+  letter-spacing: 1px; /* 减少字间距 */
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  line-height: 1.2; /* 减少行高 */
+}
+
+.subtitle {
+  font-size: 15px; /* 缩小副标题字体 */
+  opacity: 0.9;
+  margin: 0;
+  font-weight: 400;
+  line-height: 1.3; /* 减少行高 */
+}
+
+/* 移动端响应式调整 */
+@media (max-width: 600px) {
+  .hero {
+    margin-bottom: 12px; /* 移动端进一步减少底部间距 */
+  }
+  
+  .hero-header {
+    gap: 12px; /* 移动端进一步减少间距 */
+    margin-bottom: 8px; /* 移动端进一步减少底部间距 */
+    flex-direction: column; /* 可选：改为垂直布局节省空间 */
+  }
+  
+  .title {
+    font-size: 28px; /* 移动端进一步缩小标题 */
+    letter-spacing: 0.5px;
+    line-height: 1.1;
+  }
+  
+  .subtitle {
+    font-size: 13px; /* 移动端进一步缩小副标题 */
+    line-height: 1.2;
+  }
+}
+
+/* 如果需要更紧凑，可以使用这个版本 */
+/*
+.hero {
+  text-align: center;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  line-height: 1.1;
+}
+
+.subtitle {
+  font-size: 14px;
+  opacity: 0.9;
+  margin: 0;
+  font-weight: 400;
+  line-height: 1.2;
+}
+*/
 </style>
