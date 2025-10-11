@@ -353,9 +353,12 @@
       // 完成后延迟跳转，让用户看到完成消息
       setTimeout(() => {
         if (showProgress.value) {
-          closeProgress()
+          
           // 确保项目名正确后再跳转
           const projectToNavigate = completedProject.value || currentProject.value
+          closeProgress()
+          console.log("-----------------------------------:"+projectToNavigate)
+
           if (projectToNavigate) {
             console.log('跳转到项目:', projectToNavigate)
             router.push(`/wiki/${projectToNavigate}`)
@@ -424,7 +427,7 @@
         path: path.value.trim(),
         language: wikiLanguage.value
       })
-      
+      currentProject.value = data.project
       console.log('导入API返回:', data)
       
       // 更新项目名为API返回的项目名（可能和路径提取的不同）
@@ -489,9 +492,8 @@
           'Content-Type': 'multipart/form-data'
         }
       })
-  
       console.log('上传API返回:', data)
-      
+      currentProject.value = data.project
       // 更新项目名为API返回的项目名
       if (data.project && data.project !== currentProject.value) {
         currentProject.value = data.project
