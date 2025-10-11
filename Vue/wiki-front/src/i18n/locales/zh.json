@@ -24,7 +24,8 @@
     "edit": "编辑",
     "search": "搜索",
     "settings": "设置",
-    "language": "语言"
+    "language": "语言",
+    "cancelling": "取消中..."
   },
   "home": {
     "title": "EWiki",
@@ -48,7 +49,8 @@
     "english": "英文",
     "endoclang": "英文文档",
     "zhdoclang": "中文文档",
-    "languageHint": "选择生成Wiki文档的语言"
+    "languageHint": "选择生成Wiki文档的语言",
+    "generatingWiki": "正在生成Wiki..."
   },
   "sidebar": {
     "repoOverview": "📚 仓库概览",
