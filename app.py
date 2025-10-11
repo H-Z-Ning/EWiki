@@ -1162,7 +1162,7 @@ def extract_tar(tar_path: Path, extract_to: Path) -> bool:
 
 
 # ~~~~~~~~~~~~~~ 静态文件（可选） ~~~~~~~~~~~~~~
-app.mount("/static", StaticFiles(directory=str(OUTPUT_BASE), html=True), name="static")
+app.mount("/static", StaticFiles(directory=str(OUTPUT_BASE), html=False), name="static")
 
 # ==============================================================================
 # 启动
