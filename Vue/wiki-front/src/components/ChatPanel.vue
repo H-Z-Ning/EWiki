@@ -1602,24 +1602,25 @@ onMounted(() => {
 
 /* 重新设计的底部触发条 - 加长版本 */
 .chat-trigger {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 90%;
-  max-width: 600px; /* 增加最大宽度 */
-  background: rgba(255, 255, 255, 0.95);
+  /* 视觉变量 */
+  --bg-alpha: 0.85;
+  --bg-color: #1f1f1f;          /* 深灰 */
+  --border-color: rgba(194, 242, 243, 0.12);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.15);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.25);
+
+  background: rgba(var(--rgb-bg), var(--bg-alpha));
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  padding: 0;
-  cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  z-index: 1000;
+  border: 1px solid var(--border-color);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    0 2px 8px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    var(--shadow-lg),
+    var(--shadow-sm),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* RGB 写法，方便改透明度 */
+:root {
+  --rgb-bg: 31,31,31;
 }
 
 .chat-trigger:hover {
