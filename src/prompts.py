@@ -167,7 +167,169 @@ Remember:
 - Structure the document logically for easy understanding by other developers.
 """
 
+# 英文版本的提示词
+PLAN_WIKI_PROMPT_EN = """\
+Analyze this GitHub repository {repo} and create a wiki structure for it.
 
+1. The complete file tree of the project:
+<file_tree>
+{file_tree}
+</file_tree>
+
+2. The README file of the project:
+<readme>
+{readme}
+</readme>
+
+3. Relevant code information is as follows:
+{code_contents}
+
+I want to create a wiki for this repository. Determine the most logical structure for a wiki based on the repository's content.
+
+IMPORTANT: The wiki content will be generated in English language.
+
+When designing the wiki structure, include pages that would benefit from visual diagrams, such as:
+- Architecture overviews
+- Data flow descriptions
+- Component relationships
+- Process workflows
+- State machines
+- Class hierarchies
+
+Create a structured wiki with the following main sections:
+- System Architecture (how the system is designed)
+- Core Features (key functionality)
+- Data Management/Flow: If applicable, how data is stored, processed, accessed, and managed (e.g., database schema, data pipelines, state management).
+- Frontend Components (UI elements, if applicable.)
+- Backend Systems (server-side components)
+- Model Integration (AI model connections)
+- Deployment/Infrastructure (how to deploy, what's the infrastructure like)
+- Extensibility and Customization: If the project architecture supports it, explain how to extend or customize its functionality (e.g., plugins, theming, custom modules, hooks).
+
+
+Each section should contain relevant pages. For example, the "Frontend Components" section might include pages for "Home Page", "Repository Wiki Page", "Ask Component", etc.
+
+Return your analysis in the following XML format:
+
+- Return ONLY valid XML
+- Split the whole project into 1-2 high-level "modules" (pages)
+- id is in English
+- Each page must have:
+  <page id="xxx">
+    <title>Human-readable title</title>
+    <description>One-sentence summary</description>
+    <relevant_files>comma-separated file paths (choose from the tree)</relevant_files>
+  </page>
+- Do NOT wrap XML in markdown blocks
+
+Example return:
+<wiki>
+  <page id="configuration">
+    <title>Configuration System</title>
+    <description>How to configure the project</description>
+    <relevant_files>src/config.py,src/utils.py</relevant_files>
+  </page>
+  ...
+</wiki>
+
+IMPORTANT FORMATTING INSTRUCTIONS:
+- Return ONLY the valid XML structure specified above
+- DO NOT wrap the XML in markdown code blocks (no \`\`\` or \`\`\`xml)
+- DO NOT include any explanation text before or after the XML
+- Ensure the XML is properly formatted and valid
+- Start directly with <wiki_structure> and end with </wiki_structure>
+
+IMPORTANT:
+1. Create  '6-8'  pages that would make a 'comprehensive' wiki for this repository
+2. Each page should focus on a specific aspect of the codebase (e.g., architecture, key features, setup)
+3. The relevant_files should be actual files from the repository that would be used to generate that page
+4. Return ONLY valid XML with the structure specified above, with no markdown code block delimiters
+"""
+
+WRITE_PAGE_PROMPT_EN = """\
+You are an expert technical writer and software architect.
+Your task is to generate a comprehensive and accurate technical wiki page in Markdown format about a specific feature, system, or module within a given software project.
+
+
+
+1.  **Introduction:** Start with a concise introduction (2-3 paragraphs) explaining the purpose, scope, and high-level overview of "{title}" within the context of the overall project. If relevant, and if information is available in the provided files, link to other potential wiki pages using the format \`[Link Text](#page-anchor-or-id)\`.
+
+2.  **Detailed Sections:** Break down "{title}" into logical sections using H2 (\`##\`) and H3 (\`###\`) Markdown headings. For each section:
+    *   Explain the architecture, components, data flow, or logic relevant to the section's focus, as evidenced in the source files.
+    *   Identify key functions, classes, data structures, API endpoints, or configuration elements pertinent to that section.
+
+3.  **Mermaid Diagrams:**
+    *   EXTENSIVELY use Mermaid diagrams (e.g., \`flowchart TD\`, \`sequenceDiagram\`, \`classDiagram\`, \`erDiagram\`, \`graph TD\`) to visually represent architectures, flows, relationships, and schemas found in the source files.
+    *   Provide a brief explanation before or after each diagram to give context.
+    *   CRITICAL: All diagrams MUST follow strict vertical orientation:
+       - Use "graph TD" (top-down) directive for flow diagrams
+       - NEVER use "graph LR" (left-right)
+       - Maximum node width should be 3-4 words
+       - For sequence diagrams:
+         - Start with "sequenceDiagram" directive on its own line
+         - Define ALL participants at the beginning
+         - Use descriptive but concise participant names
+         - Use the correct arrow types:
+           - ->> for request/asynchronous messages
+           - -->> for response messages
+           - -x for failed messages
+         - Include activation boxes using +/- notation
+         - Add notes for clarification using "Note over" or "Note right of"
+         【Supplementary Enforcement Notice】  
+            These rules override all previous instructions. Any violation is considered a format error.
+            (1). Do **not** use “/” or “\” anywhere. Replace them with spaces or line breaks inside node text.  
+                Wrong: A[HTTP/Request]  
+                Correct: A[HTTP Request]
+            (2). Never write “Sources: …” inside the diagram. Put source information in plain text **outside** the code block.
+            (3). Never use “graph LR” or “flowchart LR”. Always use **“graph TD”** or **“flowchart TD”**.
+            (4). Node labels must be ≤ 4 English words. Use tool-tips or sub-graphs if longer.
+            (5). Sequence diagrams must start with **“sequenceDiagram”** on its own line.  
+               Participant names must not contain “/” or “\”.  
+               Arrows allowed only: `->>`, `-->>`, `-x`.
+            (6). Self-check with the following regex before output; **rewrite if any match**:  
+               - Contains “/” or “\” → reject  
+               - Contains “Sources:” → reject  
+               - Contains “LR” → reject  
+               - Node label > 4 words → reject
+            (7). Return only two parts:  
+               - Brief explanation (no code)  
+               - Clean ```mermaid … ``` block with **zero comments, zero blank lines, zero “Sources”**.
+
+4.  **Tables:**
+    *   Use Markdown tables to summarize information such as:
+        *   Key features or components and their descriptions.
+        *   API endpoint parameters, types, and descriptions.
+        *   Configuration options, their types, and default values.
+        *   Data model fields, types, constraints, and descriptions.
+
+5.  **Code Snippets (ENTIRELY OPTIONAL):**
+    *   Include short, relevant code snippets (e.g., Python, Java, JavaScript, SQL, JSON, YAML) directly from the \`[RELEVANT_SOURCE_FILES]\` to illustrate key implementation details, data structures, or configurations.
+    *   Ensure snippets are well-formatted within Markdown code blocks with appropriate language identifiers.
+
+6.  **Source Citations (EXTREMELY IMPORTANT):**
+    *   For EVERY piece of significant information, explanation, diagram, table entry, or code snippet, you MUST cite the specific source file(s) and relevant line numbers from which the information was derived.
+    *   Place citations at the end of the paragraph, under the diagram/table, or after the code snippet.
+    *   Use the exact format: \`Sources: [filename.ext:start_line-end_line]()\` for a range, or \`Sources: [filename.ext:line_number]()\` for a single line. Multiple files can be cited: \`Sources: [file1.ext:1-10](), [file2.ext:5](), [dir/file3.ext]()\` (if the whole file is relevant and line numbers are not applicable or too broad).
+    *   If an entire section is overwhelmingly based on one or two files, you can cite them under the section heading in addition to more specific citations within the section.
+    *   IMPORTANT: You MUST cite AT LEAST 5 different source files throughout the wiki page to ensure comprehensive coverage.
+
+7.  **Technical Accuracy:** All information must be derived SOLELY from the \`[RELEVANT_SOURCE_FILES]\`. Do not infer, invent, or use external knowledge about similar systems or common practices unless it's directly supported by the provided code. If information is not present in the provided files, do not include it or explicitly state its absence if crucial to the topic.
+
+8.  **Clarity and Conciseness:** Use clear, professional, and concise technical language suitable for other developers working on or learning about the project. Avoid unnecessary jargon, but use correct technical terms where appropriate.
+
+9.  **Conclusion/Summary:** End with a brief summary paragraph if appropriate for "{title}", reiterating the key aspects covered and their significance within the project.
+
+IMPORTANT: Generate the content in English language.
+Project context information: 
+{file_contents}
+
+Relevant code information is as follows:
+{code_contents}
+Remember:
+- Ground every claim in the provided source files.
+- Prioritize accuracy and direct representation of the code's functionality and structure.
+- Structure the document logically for easy understanding by other developers.
+"""
 
 
 
