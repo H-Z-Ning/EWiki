@@ -280,14 +280,317 @@ def list_projects():
     return [p.name for p in OUTPUT_BASE.iterdir() if p.is_dir()]
 
 
+from fastapi import WebSocket, WebSocketDisconnect
+import json
+import asyncio
+
+
+# 添加进度状态管理
+class ProgressManager:
+    def __init__(self):
+        self.connections = {}
+
+    async def connect(self, websocket: WebSocket, project: str):
+        await websocket.accept()
+        if project not in self.connections:
+            self.connections[project] = []
+        self.connections[project].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, project: str):
+        if project in self.connections:
+            self.connections[project].remove(websocket)
+            if not self.connections[project]:
+                del self.connections[project]
+
+    async def send_progress(self, project: str, progress: dict):
+        if project in self.connections:
+            for connection in self.connections[project]:
+                try:
+                    await connection.send_json(progress)
+                except:
+                    pass
+
+
+progress_manager = ProgressManager()
+
+from fastapi import WebSocket, WebSocketDisconnect
+import json
+import asyncio
+from typing import Dict, List
+
+
+class ConnectionManager:
+    def __init__(self):
+        # 存储项目到WebSocket连接的映射
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, project: str):
+        await websocket.accept()
+        if project not in self.active_connections:
+            self.active_connections[project] = []
+        self.active_connections[project].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, project: str):
+        if project in self.active_connections:
+            self.active_connections[project].remove(websocket)
+            if not self.active_connections[project]:
+                del self.active_connections[project]
+
+    async def send_progress(self, project: str, message: dict):
+        if project in self.active_connections:
+            disconnected = []
+            for connection in self.active_connections[project]:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    print(f"发送进度失败: {e}")
+                    disconnected.append(connection)
+
+            # 移除断开的连接
+            for connection in disconnected:
+                self.disconnect(connection, project)
+
+
+manager = ConnectionManager()
+
+
+# WebSocket 路由
+@app.websocket("/ws/progress/{project}")
+async def websocket_endpoint(websocket: WebSocket, project: str):
+    await manager.connect(websocket, project)
+    try:
+        while True:
+            # 保持连接活跃
+            data = await websocket.receive_text()
+            # 可以处理客户端发送的消息（如果需要）
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, project)
+        print(f"WebSocket 断开连接: {project}")
+
+
+# 修改 build_wiki_with_progress 函数
+async def build_wiki_with_progress(project: str, language: str = "zh") -> None:
+    """
+    带进度更新的wiki构建函数
+    """
+    import xml.etree.ElementTree as ET
+    from src.utils import write_markdown
+
+    try:
+        # 发送开始进度
+        await manager.send_progress(project, {
+            "stage": "started",
+            "progress": 5,
+            "message": "开始构建Wiki..."
+        })
+        await asyncio.sleep(0.1)  # 确保消息发送
+
+        # ---------- 0. 路径 ----------
+        src = REPOS_DIR / project
+        out = OUTPUT_BASE / project
+        data_out = out / "data"
+        source_code_stone = data_out / "source_code_stone"
+        java_callgraph_stone = data_out / "java_callgraph_stone"
+        out.mkdir(parents=True, exist_ok=True)
+        data_out.mkdir(parents=True, exist_ok=True)
+        java_callgraph_stone.mkdir(parents=True, exist_ok=True)
+        source_code_stone.mkdir(parents=True, exist_ok=True)
+
+        await manager.send_progress(project, {
+            "stage": "preparing",
+            "progress": 10,
+            "message": "初始化目录结构..."
+        })
+        await asyncio.sleep(0.1)
+
+        # ---------- 1. 文件树 & README ----------
+        file_tree = "\n".join(
+            str(p.relative_to(src))
+            for p in sorted(src.rglob("*"))
+            if p.is_file() and not str(p.name).startswith(".")
+        )
+        readme_file = src / "README.md"
+        readme = readme_file.read_text(encoding="utf-8") if readme_file.exists() else "No README"
+
+        await manager.send_progress(project, {
+            "stage": "analyzing",
+            "progress": 20,
+            "message": "分析项目文件结构..."
+        })
+        await asyncio.sleep(0.1)
+
+        # ---------- 2. 生成 wiki 结构 ----------
+        try:
+            await manager.send_progress(project, {
+                "stage": "planning",
+                "progress": 30,
+                "message": "规划Wiki结构..."
+            })
+            await asyncio.sleep(0.1)
+
+            plan_xml = plan_wiki_structure(project, file_tree, readme, src, source_code_stone, java_callgraph_stone,
+                                           language)
+
+            await manager.send_progress(project, {
+                "stage": "parsing",
+                "progress": 40,
+                "message": "解析Wiki结构..."
+            })
+            await asyncio.sleep(0.1)
+        except Exception as e:
+            log.exception("[build_wiki] plan_wiki_structure failed")
+            await manager.send_progress(project, {
+                "stage": "error",
+                "progress": 0,
+                "message": f"生成Wiki结构失败: {str(e)}"
+            })
+            raise RuntimeError("generate wiki structure failed") from e
+
+        # ---------- 3. 解析 XML ----------
+        try:
+            root = ET.fromstring(plan_xml)
+        except ET.ParseError as e:
+            log.error("[build_wiki] XML parse error – %.200s", plan_xml)
+            await manager.send_progress(project, {
+                "stage": "error",
+                "progress": 0,
+                "message": f"解析Wiki结构失败: {str(e)}"
+            })
+            raise RuntimeError("invalid wiki xml") from e
+
+        pages = []
+        for page in root.findall("page"):
+            pid = page.get("id")
+            title = page.findtext("title")
+            description = page.findtext("description")
+            files = page.findtext("relevant_files")
+            if not (pid and title and files):
+                log.warning("[build_wiki] skip incomplete <page>")
+                continue
+            pages.append((pid, description, title, [f.strip() for f in files.split(",") if f.strip()]))
+
+        if not pages:
+            log.warning("[build_wiki] no valid page found")
+            await manager.send_progress(project, {
+                "stage": "error",
+                "progress": 0,
+                "message": "未找到有效的页面配置"
+            })
+            return
+
+        await manager.send_progress(project, {
+            "stage": "generating_pages",
+            "progress": 50,
+            "message": f"开始生成 {len(pages)} 个页面...",
+            "total_pages": len(pages)
+        })
+        await asyncio.sleep(0.1)
+
+        # ---------- 4. 逐页生成 markdown ----------
+        module_docs: Dict[str, str] = {}
+        for i, (pid, title, description, file_paths) in enumerate(pages):
+            current_progress = 50 + int((i / len(pages)) * 40)
+            await manager.send_progress(project, {
+                "stage": "generating_page",
+                "progress": current_progress,
+                "message": f"正在生成页面: {title}",
+                "current_page": i + 1,
+                "total_pages": len(pages)
+            })
+            await asyncio.sleep(0.1)
+
+            log.info("[build_wiki] ---- generate page | id=%s title=%s files=%s", pid, title, file_paths)
+            try:
+                md = write_page(title, description, file_paths, src, source_code_stone, java_callgraph_stone, language)
+                module_docs[pid] = md
+                log.info("[build_wiki] page done | id=%s len=%s", pid, len(md))
+            except Exception as e:
+                log.exception("[build_wiki] write_page failed | id=%s", pid)
+                await manager.send_progress(project, {
+                    "stage": "error",
+                    "progress": 0,
+                    "message": f"生成页面 {title} 失败: {str(e)}"
+                })
+                raise RuntimeError(f"generate page {pid} failed") from e
+
+            # 落盘
+            md_path = out / "modules" / f"{pid}.md"
+            md_path.parent.mkdir(parents=True, exist_ok=True)
+            md_path.write_text(f"# {title}\n\n{md}", encoding="utf-8")
+
+        await manager.send_progress(project, {
+            "stage": "finalizing",
+            "progress": 90,
+            "message": "生成项目总览..."
+        })
+        await asyncio.sleep(0.1)
+
+        # ---------- 5. 项目总览 PROJECT.md ----------
+        project_md = out / "PROJECT.md"
+        if project_md.exists():
+            readme = project_md.read_text(encoding="utf-8")
+            log.info("[build_wiki] use existing PROJECT.md")
+        else:
+            summaries = []
+            for (pid, desc, title, file_list), doc in zip(pages, module_docs.values()):
+                lines = doc.splitlines()[:20]  # 前 20 行
+                preview = os.linesep.join(lines)  # 拼回字符串
+                summaries.append(f"- **{title}**（{desc}）：\n{preview}")
+
+            wiki_lines = "\n".join(summaries)
+            log.info("[build_wiki] generating PROJECT.md ...")
+            try:
+                if language == "en":
+                    readme = write_page_from_dir("Project Overview", wiki_lines, out / "modules", src,
+                                                 source_code_stone,
+                                                 java_callgraph_stone, language)
+                else:
+                    readme = write_page_from_dir("项目总览", wiki_lines, out / "modules", src, source_code_stone,
+                                                 java_callgraph_stone, language)
+                project_md.write_text(readme, encoding="utf-8")
+                log.info("[build_wiki] PROJECT.md done | len=%s", len(readme))
+            except Exception as e:
+                log.exception("[build_wiki] generate PROJECT.md failed")
+                await manager.send_progress(project, {
+                    "stage": "error",
+                    "progress": 0,
+                    "message": f"生成项目总览失败: {str(e)}"
+                })
+                raise
+
+        # ---------- 6. 索引 & 内存缓存 ----------
+        write_markdown(str(out), module_docs, {p[0]: {"title": p[1]} for p in pages})
+        project_readmes[project] = readme
+        project_modules[project] = list(module_docs.keys())
+
+        await manager.send_progress(project, {
+            "stage": "completed",
+            "progress": 100,
+            "message": "Wiki生成完成！"
+        })
+        await asyncio.sleep(0.1)
+
+        log.info("[build_wiki] <<< all finished – project=%s | modules=%s", project, len(module_docs))
+
+    except Exception as e:
+        log.exception(f"构建Wiki失败: {e}")
+        await manager.send_progress(project, {
+            "stage": "error",
+            "progress": 0,
+            "message": f"构建失败: {str(e)}"
+        })
+        raise
+
+
 @app.post("/api/import")
 async def import_and_build(req: ImportReq):
     try:
         name = import_project(req.path)
-        # >>> 新增：已有 wiki 直接返回
         if (OUTPUT_BASE / name / "PROJECT.md").exists():
             return {"project": name, "message": "wiki already exists"}
-        build_wiki(name, req.language)  # 传递语言参数
+
+        # 使用带进度的构建函数
+        await build_wiki_with_progress(name, req.language)
         return {"project": name}
     except Exception as e:
         log.exception("import failed")
@@ -703,7 +1006,7 @@ class FileUploadReq(BaseModel):
 
 @app.post("/api/upload")
 async def upload_and_build(file: UploadFile = File(...), language: str = "zh"):
-    """上传压缩文件并生成 Wiki"""
+    """上传压缩文件并生成 Wiki（带进度）"""
     try:
         # 检查文件类型
         allowed_extensions = {'.zip', '.rar', '.7z', '.tar', '.gz'}
@@ -759,8 +1062,8 @@ async def upload_and_build(file: UploadFile = File(...), language: str = "zh"):
         if (OUTPUT_BASE / project_name / "PROJECT.md").exists():
             return {"project": project_name, "message": "wiki already exists"}
 
-        # 构建 Wiki（传递语言参数）
-        build_wiki(project_name, language)
+        # 使用带进度的构建函数
+        await build_wiki_with_progress(project_name, language)
 
         return {"project": project_name}
     except HTTPException:
