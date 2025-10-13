@@ -1,3 +1,5 @@
+[English](./README.md) | [简体中文](./README.zh.md) 
+---
 # 🚀 EWiki
 
 EWiki is an automation tool that generates detailed Wiki documentation from local or uploaded projects. It analyzes source code, creates relevant pages, structures the project, and uses LLM (Large Language Model) to produce documentation. EWiki supports multiple code formats and allows users to upload knowledge-base files for further enrichment.
@@ -5,8 +7,7 @@ EWiki is an automation tool that generates detailed Wiki documentation from loca
 ## 🌌 Live Demo
 [Click to visit EWiki](http://123.56.109.84:3000/)
 
-[English](./README.md) | [简体中文](./README.zh.md) 
----
+
 ## ✨ Features
 - **Multi-language support**: Generate Wiki docs for Java, Python, JavaScript and more.
 - **Automated Wiki generation**: Automatically analyze source code and create corresponding pages.
