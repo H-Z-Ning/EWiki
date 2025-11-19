@@ -926,7 +926,6 @@ async def chat(project: str, req: ChatRequest):
             code_contexts = query_code(
                 query=search_query,
                 project_root=str(repo_path),
-                topk=req.topk,
                 out_path=str(source_code_stone)
             )
             log.info(f"[chat] Retrieved code contexts, length: {len(code_contexts)}")
