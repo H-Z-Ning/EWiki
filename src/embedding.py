@@ -65,20 +65,48 @@ def list_files(root: str):
 
 
 def read_chunks(path: str, max_lines=MAX_LINES):
-    with open(path, encoding="utf-8", errors="ignore") as g:
-        lines = g.readlines()
-    chunks, buf, start = [], [], 1
-    for idx, line in enumerate(lines, 1):
-        buf.append(line)
-        if re.match(r"^\s*$", line) or re.match(r"^\s*[})\]]\s*$", line):
-            if buf:
-                chunks.append((start, "".join(buf)))
-                buf, start = [], idx
-        if len(buf) >= max_lines:
-            chunks.append((start, "".join(buf)))
-            buf, start = [], idx
-    if buf:
-        chunks.append((start, "".join(buf)))
+    """
+       改进的文本分块函数
+
+       修复空行处理和行号计算问题，避免生成过小的文本块
+       """
+    skip_empty_lines = False  # 默认不跳过空行，避免行号计算错误
+    min_chunk_size = 10  # 最小块大小（字符数），避免过小的块
+
+    chunks = []
+    current_chunk = []
+    current_line_count = 0
+    start_line = 1
+
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        lines = list(f)  # 一次性读取所有行
+
+    actual_line_num = 0
+    for line_num, line in enumerate(lines, 1):
+        # 处理空行
+        if skip_empty_lines and not line.strip():
+            continue
+
+        actual_line_num += 1
+        current_chunk.append(line)
+        current_line_count += 1
+
+        # 达到最大行数时分割
+        if current_line_count >= max_lines:
+            chunk_text = "".join(current_chunk)
+            # 只有块达到最小大小才保存
+            if len(chunk_text.strip()) >= min_chunk_size:
+                chunks.append((start_line, chunk_text))
+            current_chunk = []
+            current_line_count = 0
+            start_line = actual_line_num + 1
+
+    # 处理剩余内容
+    if current_chunk:
+        chunk_text = "".join(current_chunk)
+        if len(chunk_text.strip()) >= min_chunk_size:
+            chunks.append((start_line, chunk_text))
+
     return chunks
 
 
